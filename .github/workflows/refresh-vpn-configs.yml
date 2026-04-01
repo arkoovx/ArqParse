@@ -1,0 +1,39 @@
+name: Refresh and retest VPN configs
+
+on:
+  schedule:
+    # Каждые 24 часа (00:00 UTC)
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Prepare Xray binary
+        run: chmod +x ./bin/xray
+
+      - name: Redownload and retest configs
+        run: python main.py --force --no-ui
+
+      - name: Commit refreshed subscriptions
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: refresh tested VPN subscriptions"
+          file_pattern: rawconfigs/*.txt results/*.txt

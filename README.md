@@ -1,187 +1,85 @@
 # ArcParse
 
-**VPN Config Parser & Tester** — утилита для скачивания и тестирования VPN конфигов.
+**ArcParse** — утилита для автоматического перескачивания и тестирования VPN-конфигов.
 
 ---
 
-## Возможности
+## Готовые протестированные подписки
 
-- ✅ **Скачивание конфигов** из GitHub репозиториев
-- ✅ **Тестирование Xray** (VLESS, VMess, Trojan, Shadowsocks)
-- ✅ **Тестирование MTProto** (Telegram прокси)
-- ✅ **Сортировка по пингу** — лучшие конфиги сверху
-- ✅ **Гибкая настройка** — несколько источников, лимиты пинга
-- ✅ **Стильный интерфейс** — цветной вывод с прогресс-барами
+Ниже — файлы, которые обновляются GitHub Actions автоматически раз в 24 часа:
+
+- **Base VPN**: [`results/top_vpn.txt`](results/top_vpn.txt)
+- **Bypass VPN**: [`results/top_bypass.txt`](results/top_bypass.txt)
+- **Telegram MTProto**: [`results/top_MTProto.txt`](results/top_MTProto.txt)
+
+Если нужен прямой subscription-URL для клиента, используйте raw-ссылку вашего форка:
+
+```text
+https://raw.githubusercontent.com/<username>/<repo>/<branch>/results/top_vpn.txt
+https://raw.githubusercontent.com/<username>/<repo>/<branch>/results/top_bypass.txt
+https://raw.githubusercontent.com/<username>/<repo>/<branch>/results/top_MTProto.txt
+```
 
 ---
 
-## Установка
+## Как это работает
+
+- Каждые 24 часа workflow `.github/workflows/refresh-vpn-configs.yml` запускает:
+  1. перескачивание исходников конфигов,
+  2. ретест доступности и пинга,
+  3. обновление файлов в `results/`.
+- Также запуск можно сделать вручную через **Actions → Refresh and retest VPN configs → Run workflow**.
+
+---
+
+## Для разработчиков
+
+### Локальный запуск
 
 ```bash
 # Перейдите в директорию проекта
 cd ArcParse
 
 # Установите зависимости
-./venv/bin/pip install -r requirements.txt
+python -m pip install -r requirements.txt
+
+# Полный запуск
+python main.py
+
+# Принудительное обновление и ретест
+python main.py --force --no-ui
 ```
 
 ### Требования
 
 - Python 3.8+
-- Xray-core (для тестирования Xray конфигов)
+- Xray-core (бинарник `bin/xray` для Linux/macOS или `bin/xray.exe` для Windows)
 
-Для установки Xray-core:
-```bash
-# Скачайте с https://github.com/XTLS/Xray-core/releases
-# Поместите бинарник в папку bin/
-```
+### Настройка источников и задач
 
----
+Изменяется в `config.py` через список `TASKS`:
 
-## Использование
-
-### Базовый запуск
-
-```bash
-./venv/bin/python main.py
-```
-
-### Только MTProto (быстро, ~5 сек)
-
-```bash
-./venv/bin/python main.py --skip-xray
-```
-
-### С прокси (для ускорения Xray тестов)
-
-```bash
-./venv/bin/python main.py --proxy socks5://127.0.0.1:10808
-```
-
-### Принудительное обновление конфигов
-
-```bash
-./venv/bin/python main.py --force
-```
-
-### Простой вывод (без стильного интерфейса)
-
-```bash
-./venv/bin/python main.py --no-ui
-```
-
----
-
-## Настройка
-
-Откройте `config.py` и измените список задач:
-
-```python
-TASKS = [
-    {
-        "name": "Base VPN",
-        "urls": [
-            "https://raw.githubusercontent.com/.../22.txt",
-            "https://raw.githubusercontent.com/.../23.txt",
-        ],
-        "raw_files": ["rawconfigs/22.txt", "rawconfigs/23.txt"],
-        "out_file": "results/top_vpn.txt",
-        "type": "xray",
-        "target_url": "https://google.com",
-        "max_ping_ms": 15000,
-        "required_count": 10
-    },
-    # Добавьте свои задачи...
-]
-```
-
-### Параметры задачи
-
-| Параметр | Описание |
-|----------|----------|
-| `name` | Название задачи |
-| `urls` | Список URL источников (проверяются по порядку) |
-| `raw_files` | Пути для сохранения скачанных файлов |
-| `out_file` | Путь для сохранения результатов |
-| `type` | Тип тестера: `xray` или `mtproto` |
-| `target_url` | URL для тестирования |
-| `max_ping_ms` | Максимальный пинг (мс) |
-| `required_count` | Сколько рабочих конфигов найти |
+- `urls` — источники (проверяются по порядку),
+- `raw_files` — куда сохранить сырые файлы,
+- `out_file` — итоговый файл подписки,
+- `type` — `xray` или `mtproto`,
+- `target_url`, `max_ping_ms`, `required_count` — параметры тестирования.
 
 ---
 
 ## Структура проекта
 
-```
+```text
 ArcParse/
-├── config.py              # Настройки задач
-├── downloader.py          # Скачивание конфигов
-├── parser.py              # Парсинг Xray/MTProto ссылок
-├── testers.py             # Тестер Xray конфигов
-├── testers_mtproto.py     # Тестер MTProto прокси
-├── xray_tester_simple.py  # Базовый Xray тестер
-├── ui.py                  # Стильный консольный интерфейс
-├── main.py                # Основная логика
-├── requirements.txt       # Зависимости Python
-├── bin/
-│   └── xray              # Xray-core бинарник
-├── rawconfigs/           # Скачанные файлы
-└── results/              # Результаты тестирования
-```
-
----
-
-## Результаты
-
-После завершения работы результаты сохраняются в папку `results/`:
-
-- `top_vpn.txt` — лучшие VPN конфиги
-- `top_bypass.txt` — лучшие обходные конфиги
-- `top_MTProto.txt` — лучшие MTProto прокси
-
-Формат файла:
-```
-#profile-title: ArcParse results
-#profile-update-interval: 48
-
-vless://... # 150ms
-vless://... # 200ms
-```
-
----
-
-## Примеры
-
-### Тестирование с выводом прогресса
-
-```
-▶ Base VPN
-  Макс. пинг: 15000 мс
-  Нужно найти: 10
-  
-  Источник: 22.txt
-  Конфигов после фильтрации: 2109
-  
-  Тестирование...
-  
-  Progress: [██████░░░░░░░░░░░░░░░] 30.0% | 632/2109 | 15 working
-  ✓ [  1/2109]   125.3 ms | vless://...
-  ✓ [  2/2109]   250.7 ms | vless://...
-  
-  Найдено в этом файле: 10 (всего: 10/10)
-✓ Сохранено 10 конфигов в top_vpn.txt
-```
-
-### Итоговая таблица
-
-```
-╔══════════════════════════════════════════════════════════╗
-║  #    Ping     Config                                    ║
-║  ────  ─────────  ────────────────────────────────────────║
-║  1       125 ms  vless://abc123...                       ║
-║  2       250 ms  vless://def456...                       ║
-║  3       380 ms  trojan://ghi789...                      ║
-╚══════════════════════════════════════════════════════════╝
+├── .github/workflows/refresh-vpn-configs.yml
+├── config.py
+├── downloader.py
+├── parser.py
+├── testers.py
+├── testers_mtproto.py
+├── main.py
+├── rawconfigs/
+└── results/
 ```
 
 ---
@@ -192,6 +90,14 @@ MIT
 
 ---
 
-## Поддержка
+## Примечание об авторстве
 
-Если возникли вопросы или проблемы, создайте issue в репозитории.
+Код написан нейронкой с использованием кода из проекта: https://github.com/whoahaow/rjsxrd
+
+## ДИСКЛЕЙМЕР
+
+Автор не является владельцем/разработчиком/поставщиком перечисленных VPN-конфигураций. Это независимый информационный обзор и результаты тестирования.
+
+Данный пост не является рекламой VPN. Материал предназначен исключительно в информационных целях, и только для граждан тех стран, где эта информация легальна, как минимум - в научных целях. Автор не имеет никаких намерений, не побуждает, не поощряет и не оправдывает использование VPN ни при каких обстоятельствах. Ответственность за любое применение данных VPN-конфигураций — на их пользователе. Отказ от ответственности: автор не несёт ответственность за действия третьих лиц и не поощряет противоправное использование VPN. Используйте в соответствии с местным законодательством.
+
+Используйте VPN только в законных целях: в частности - для обеспечения вашей безопасности в сети и защищённого удалённого доступа, и ни в коем случае не применяйте данную технологию для обхода блокировок.
