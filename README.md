@@ -6,13 +6,12 @@
 
 ## Готовые протестированные подписки
 
-Ниже — raw-ссылки вашего форка (обновляются GitHub Actions автоматически раз в 24 часа):
+Ниже — прямые raw-ссылки на самообновляющиеся файлы из `results` (обновляются GitHub Actions автоматически раз в 24 часа):
 
-- **Base VPN**: [https://raw.githubusercontent.com/<username>/<repo>/<branch>/results/top_vpn.txt](https://raw.githubusercontent.com/<username>/<repo>/<branch>/results/top_vpn.txt)
-- **Bypass VPN**: [https://raw.githubusercontent.com/<username>/<repo>/<branch>/results/top_bypass.txt](https://raw.githubusercontent.com/<username>/<repo>/<branch>/results/top_bypass.txt)
-- **Telegram MTProto**: [https://raw.githubusercontent.com/<username>/<repo>/<branch>/results/top_MTProto.txt](https://raw.githubusercontent.com/<username>/<repo>/<branch>/results/top_MTProto.txt)
+- **Base VPN**: [https://raw.githubusercontent.com/arkoovx/ArcParse/refs/heads/main/results/top_vpn.txt](https://raw.githubusercontent.com/arkoovx/ArcParse/refs/heads/main/results/top_vpn.txt)
+- **Bypass VPN**: [https://raw.githubusercontent.com/arkoovx/ArcParse/refs/heads/main/results/top_bypass.txt](https://raw.githubusercontent.com/arkoovx/ArcParse/refs/heads/main/results/top_bypass.txt)
+- **Telegram MTProto**: [https://raw.githubusercontent.com/arkoovx/ArcParse/refs/heads/main/results/top_MTProto.txt](https://raw.githubusercontent.com/arkoovx/ArcParse/refs/heads/main/results/top_MTProto.txt)
 
-Замените `<username>`, `<repo>` и `<branch>` на данные вашего форка.
 
 ---
 
