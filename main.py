@@ -197,7 +197,7 @@ def main(force_download: bool = False, skip_xray: bool = False, proxy_url: str =
     print(f"\n{Colors.GREEN}{Colors.BOLD}")
     print("╔══════════════════════════════════════════════════════════╗")
     print("║                                                          ║")
-    print("║     ✓  ArqParse завершен успешно!                        ║")
+    print("║     ✓  arqParse завершен успешно!                        ║")
     print("║                                                          ║")
     print(f"║     Результаты: {RESULTS_DIR:<40} ║")
     print("║                                                          ║")
@@ -404,7 +404,7 @@ def format_config_name(url: str, index: int, config_type: str = "Base VPN", ping
         return f"{base_url}#{fast_indicator}{name_suffix}"
 
 
-def save_results(filepath: str, results: list, profile_title: str = "ArqParse results", config_type: str = "Base VPN", no_ui: bool = False):
+def save_results(filepath: str, results: list, profile_title: str = "arqParse results", config_type: str = "Base VPN", no_ui: bool = False):
     """Сохраняет результаты в файл.
     
     Если результатов нет, файл не перезаписывается (сохраняет старые данные).
@@ -441,7 +441,7 @@ def save_results(filepath: str, results: list, profile_title: str = "ArqParse re
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="ArqParse - скачивание и тестирование VPN конфигов",
+        description="arqParse - скачивание и тестирование VPN конфигов",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"""
 {Colors.CYAN}Примеры:{Colors.RESET}

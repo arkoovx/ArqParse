@@ -1,10 +1,10 @@
-# Техническая документация ArqParse
+# Техническая документация arqParse
 
 ## Установка
 
 ```bash
 # Перейдите в директорию проекта
-cd ArqParse
+cd arqParse
 
 # Установите зависимости
 ./venv/bin/pip install -r requirements.txt
@@ -98,7 +98,7 @@ TASKS = [
 ## Структура проекта
 
 ```
-ArqParse/
+arqParse/
 ├── config.py              # Настройки задач
 ├── downloader.py          # Скачивание конфигов
 ├── parser.py              # Парсинг Xray/MTProto ссылок
@@ -129,7 +129,7 @@ ArqParse/
 
 Формат файла:
 ```
-#profile-title: ArqParse results
+#profile-title: arqParse results
 #profile-update-interval: 48
 #support-url: https://t.me/arqhub
 

@@ -1,4 +1,4 @@
-# ArqParse
+# arqParse
 
 **VPN Config Parser & Tester** — утилита для скачивания и тестирования VPN конфигов. Автоматически тестирует и отбирает лучшие конфиги по скорости пинга.
 
@@ -10,10 +10,10 @@
 
 | Файл | Описание |
 |------|---------|
-| [all_top_vpn.txt](https://raw.githubusercontent.com/arkoovx/ArqParse/refs/heads/main/results/all_top_vpn.txt) | Все рабочие VPN конфиги (объединённые) |
-| [top_vpn.txt](https://raw.githubusercontent.com/arkoovx/ArqParse/refs/heads/main/results/top_vpn.txt) | Лучшие VPN конфиги |
-| [top_bypass.txt](https://raw.githubusercontent.com/arkoovx/ArqParse/refs/heads/main/results/top_bypass.txt) | Лучшие обходные конфиги |
-| [top_MTProto.txt](https://raw.githubusercontent.com/arkoovx/ArqParse/refs/heads/main/results/top_MTProto.txt) | Лучшие Telegram прокси |
+| [all_top_vpn.txt](https://raw.githubusercontent.com/arkoovx/arqParse/refs/heads/main/results/all_top_vpn.txt) | Все рабочие VPN конфиги (объединённые) |
+| [top_vpn.txt](https://raw.githubusercontent.com/arkoovx/arqParse/refs/heads/main/results/top_vpn.txt) | Лучшие VPN конфиги |
+| [top_bypass.txt](https://raw.githubusercontent.com/arkoovx/arqParse/refs/heads/main/results/top_bypass.txt) | Лучшие обходные конфиги |
+| [top_MTProto.txt](https://raw.githubusercontent.com/arkoovx/arqParse/refs/heads/main/results/top_MTProto.txt) | Лучшие Telegram прокси |
 
 ### Как использовать
 
@@ -45,7 +45,7 @@
 
 ## 📚 Для разработчиков
 
-Если вы хотите настроить и запустить ArqParse локально, см. **[TECHNICAL.md](TECHNICAL.md)** для полной технической документации.
+Если вы хотите настроить и запустить arqParse локально, см. **[TECHNICAL.md](TECHNICAL.md)** для полной технической документации.
 
 Там вы найдёте:
 - Инструкции по установке
