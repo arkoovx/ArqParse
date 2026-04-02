@@ -1,197 +1,78 @@
 # ArcParse
 
-**VPN Config Parser & Tester** — утилита для скачивания и тестирования VPN конфигов.
+**VPN Config Parser & Tester** — утилита для скачивания и тестирования VPN конфигов. Автоматически тестирует и отбирает лучшие конфиги по скорости пинга.
 
 ---
 
-## Возможности
+## 📥 Готовые конфиги
 
-- ✅ **Скачивание конфигов** из GitHub репозиториев
-- ✅ **Тестирование Xray** (VLESS, VMess, Trojan, Shadowsocks)
-- ✅ **Тестирование MTProto** (Telegram прокси)
-- ✅ **Сортировка по пингу** — лучшие конфиги сверху
-- ✅ **Гибкая настройка** — несколько источников, лимиты пинга
-- ✅ **Стильный интерфейс** — цветной вывод с прогресс-барами
+Вы можете использовать уже протестированные конфиги прямо сейчас. Просто добавьте нужную подписку в ваш VPN клиент:
 
----
+| Файл | Описание |
+|------|---------|
+| [all_top_vpn.txt](https://raw.githubusercontent.com/arkoovx/ArcParse/refs/heads/main/results/all_top_vpn.txt) | Все рабочие VPN конфиги (объединённые) |
+| [top_vpn.txt](https://raw.githubusercontent.com/arkoovx/ArcParse/refs/heads/main/results/top_vpn.txt) | Лучшие VPN конфиги |
+| [top_bypass.txt](https://raw.githubusercontent.com/arkoovx/ArcParse/refs/heads/main/results/top_bypass.txt) | Лучшие обходные конфиги |
+| [top_MTProto.txt](https://raw.githubusercontent.com/arkoovx/ArcParse/refs/heads/main/results/top_MTProto.txt) | Лучшие Telegram прокси |
 
-## Установка
+### Как использовать
 
-```bash
-# Перейдите в директорию проекта
-cd ArcParse
+1. **Скопируйте ссылку** из таблицы выше (raw.githubusercontent.com URL)
+2. **Откройте ваш VPN клиент** (например: SingBox, Clash, v2rayNG, NekoBox)
+3. **Добавьте подписку** (Import from URL / Add subscription / Subscribe)
+4. **Вставьте скопированную ссылку**
 
-# Установите зависимости
-./venv/bin/pip install -r requirements.txt
-```
-
-### Требования
-
-- Python 3.8+
-- Xray-core (для тестирования Xray конфигов)
-
-Для установки Xray-core:
-```bash
-# Скачайте с https://github.com/XTLS/Xray-core/releases
-# Поместите бинарник в папку bin/
-```
+Все это - работающие конфиги, отсортированные по скорости. Используйте любой из них! ✅
 
 ---
 
-## Использование
+## ℹ️ Про приложения VPN
 
-### Базовый запуск
+Вот популярные VPN клиенты, которые поддерживают VLESS, Trojan и другие протоколы:
 
-```bash
-./venv/bin/python main.py
-```
-
-### Только MTProto (быстро, ~5 сек)
-
-```bash
-./venv/bin/python main.py --skip-xray
-```
-
-### С прокси (для ускорения Xray тестов)
-
-```bash
-./venv/bin/python main.py --proxy socks5://127.0.0.1:10808
-```
-
-### Принудительное обновление конфигов
-
-```bash
-./venv/bin/python main.py --force
-```
-
-### Простой вывод (без стильного интерфейса)
-
-```bash
-./venv/bin/python main.py --no-ui
-```
+- **Android**: v2rayNG, NekoBox, SingBox
+- **iOS**: Stash, Quantumult X, Shadowrocket
+- **Windows/Mac/Linux**: Clash, v2rayN, v2rayU, SingBox
+- **Telegram**: MTProtoProxy (используйте top_MTProto.txt)
 
 ---
 
-## Настройка
+## ⚙️ Обновления результатов
 
-Откройте `config.py` и измените список задач:
-
-```python
-TASKS = [
-    {
-        "name": "Base VPN",
-        "urls": [
-            "https://raw.githubusercontent.com/.../22.txt",
-            "https://raw.githubusercontent.com/.../23.txt",
-        ],
-        "raw_files": ["rawconfigs/22.txt", "rawconfigs/23.txt"],
-        "out_file": "results/top_vpn.txt",
-        "type": "xray",
-        "target_url": "https://google.com",
-        "max_ping_ms": 15000,
-        "required_count": 10
-    },
-    # Добавьте свои задачи...
-]
-```
-
-### Параметры задачи
-
-| Параметр | Описание |
-|----------|----------|
-| `name` | Название задачи |
-| `urls` | Список URL источников (проверяются по порядку) |
-| `raw_files` | Пути для сохранения скачанных файлов |
-| `out_file` | Путь для сохранения результатов |
-| `type` | Тип тестера: `xray` или `mtproto` |
-| `target_url` | URL для тестирования |
-| `max_ping_ms` | Максимальный пинг (мс) |
-| `required_count` | Сколько рабочих конфигов найти |
+Результаты обновляются автоматически. Подписка будет всегда получать свежие рабочие конфиги.
 
 ---
 
-## Структура проекта
+## 📚 Для разработчиков
 
-```
-ArcParse/
-├── config.py              # Настройки задач
-├── downloader.py          # Скачивание конфигов
-├── parser.py              # Парсинг Xray/MTProto ссылок
-├── testers.py             # Тестер Xray конфигов
-├── testers_mtproto.py     # Тестер MTProto прокси
-├── xray_tester_simple.py  # Базовый Xray тестер
-├── ui.py                  # Стильный консольный интерфейс
-├── main.py                # Основная логика
-├── requirements.txt       # Зависимости Python
-├── bin/
-│   └── xray              # Xray-core бинарник
-├── rawconfigs/           # Скачанные файлы
-└── results/              # Результаты тестирования
-```
+Если вы хотите настроить и запустить ArcParse локально, см. **[TECHNICAL.md](TECHNICAL.md)** для полной технической документации.
+
+Там вы найдёте:
+- Инструкции по установке
+- Параметры командной строки
+- Настройку конфигов
+- Описание структуры проекта
 
 ---
 
-## Результаты
+## 🎯 Возможности
 
-После завершения работы результаты сохраняются в папку `results/`:
-
-- `top_vpn.txt` — лучшие VPN конфиги
-- `top_bypass.txt` — лучшие обходные конфиги
-- `top_MTProto.txt` — лучшие MTProto прокси
-
-Формат файла:
-```
-#profile-title: ArcParse results
-#profile-update-interval: 48
-
-vless://... # 150ms
-vless://... # 200ms
-```
+- ✅ Скачивание конфигов из разных источников
+- ✅ Тестирование Xray (VLESS, VMess, Trojan, Shadowsocks)
+- ✅ Тестирование MTProto (Telegram прокси)
+- ✅ Сортировка по пингу — лучшие конфиги сверху
+- ✅ Автоматическое обновление на GitHub
+- ✅ Стильный интерфейс с прогресс-барами
 
 ---
 
-## Примеры
-
-### Тестирование с выводом прогресса
-
-```
-▶ Base VPN
-  Макс. пинг: 15000 мс
-  Нужно найти: 10
-  
-  Источник: 22.txt
-  Конфигов после фильтрации: 2109
-  
-  Тестирование...
-  
-  Progress: [██████░░░░░░░░░░░░░░░] 30.0% | 632/2109 | 15 working
-  ✓ [  1/2109]   125.3 ms | vless://...
-  ✓ [  2/2109]   250.7 ms | vless://...
-  
-  Найдено в этом файле: 10 (всего: 10/10)
-✓ Сохранено 10 конфигов в top_vpn.txt
-```
-
-### Итоговая таблица
-
-```
-╔══════════════════════════════════════════════════════════╗
-║  #    Ping     Config                                    ║
-║  ────  ─────────  ────────────────────────────────────────║
-║  1       125 ms  vless://abc123...                       ║
-║  2       250 ms  vless://def456...                       ║
-║  3       380 ms  trojan://ghi789...                      ║
-╚══════════════════════════════════════════════════════════╝
-```
-
----
-
-## Лицензия
+## 📄 Лицензия
 
 MIT
 
 ---
 
-## Поддержка
+## 💬 Поддержка
 
-Если возникли вопросы или проблемы, создайте issue в репозитории.
+Вопросы? Создайте issue в репозитории или напишите [@arcparse](https://t.me/arcparse) в Telegram.
+
