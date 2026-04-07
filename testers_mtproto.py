@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
 from parser import parse_mtproto_url
+from formatting import format_config_name
 
 
 def _test_single_mtproto(url: str, timeout: float) -> Tuple[bool, float, str]:
@@ -162,8 +163,9 @@ def test_mtproto_configs_and_save(
             f.write(f"#profile-title: {profile_title or 'arqVPN MTProto'}\n")
             f.write("#profile-update-interval: 48\n")
             f.write("#support-url: https://t.me/arqhub\n\n")
-            for url, _ in results:
-                f.write(f"{url}\n")
+            for idx, (url, _) in enumerate(results, 1):
+                formatted_url = format_config_name(url, idx, "Telegram MTProto", None)
+                f.write(f"{formatted_url}\n")
         if log_func:
             log_func(f"✓ Сохранено {passed} конфигов", "success")
 

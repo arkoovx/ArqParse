@@ -10,6 +10,7 @@ from typing import List, Tuple
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from xray_tester_simple import test_batch as xray_test_batch
+from formatting import format_config_name
 
 
 def test_xray_configs(
@@ -111,7 +112,7 @@ def test_xray_configs(
         failed = len([x for x in results if not x[1] or x[2] > max_ping_ms])
         working = len([x for x in results if x[1]])
         
-        # Сохраняем результаты
+        # Сохраняем результаты с форматированными именами
         if working_configs:
             os.makedirs(os.path.dirname(out_file), exist_ok=True)
             with open(out_file, 'w', encoding='utf-8') as f:
@@ -119,8 +120,9 @@ def test_xray_configs(
                 f.write("#profile-update-interval: 48\n")
                 f.write("#support-url: https://t.me/arqhub\n")
                 f.write("\n")
-                for url, ping_ms in working_configs[:required_count]:
-                    f.write(f"{url}\n")
+                for idx, (url, ping_ms) in enumerate(working_configs[:required_count], 1):
+                    formatted_url = format_config_name(url, idx, config_type, ping_ms)
+                    f.write(f"{formatted_url}\n")
             _log(f"✓ Сохранено {len(working_configs[:required_count])} конфигов", "success")
         else:
             _log(f"⚠ Рабочих конфигов не найдено", "warning")

@@ -7,7 +7,7 @@ import pytest
 # Добавляем корень проекта в sys.path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from main import format_config_name, _is_emoji, _is_regional_indicator, _url_key
+from formatting import format_config_name, _is_emoji, _is_regional_indicator, _url_key
 
 
 class TestIsEmoji:
