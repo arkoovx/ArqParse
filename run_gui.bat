@@ -1,107 +1,53 @@
 @echo off
-REM Скрипт запуска GUI на Windows с автоматической настройкой venv
-
+chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
-REM Получение пути скрипта
-set SCRIPT_DIR=%~dp0
-cd /d "%SCRIPT_DIR%"
-
-set VENV_DIR=%SCRIPT_DIR%venv
-set PYTHON_BIN=%VENV_DIR%\Scripts\python.exe
-set PIP_BIN=%VENV_DIR%\Scripts\pip.exe
-set ACTIVATE_SCRIPT=%VENV_DIR%\Scripts\activate.bat
-
-REM Заголовок
-echo.
 echo ════════════════════════════════════════════════════════
-echo   arqParse GUI - Запуск через venv
+echo   arqParse GUI — Запуск
 echo ════════════════════════════════════════════════════════
 echo.
 
-REM Проверка Python
+:: 1. Проверка Python
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo ❌ Python не найден
-    echo Установите Python 3.7+ и убедитесь что он в PATH
+    echo [X] Python не найден. Установите Python 3.8+
+    echo     https://www.python.org/downloads/
     pause
     exit /b 1
 )
+for /f "tokens=2" %%i in ('python --version 2^>^&1') do set PY_VER=%%i
+echo [+] Python найден: %PY_VER%
 
-for /f "tokens=2" %%i in ('python --version 2^>^&1') do set PYTHON_VERSION=%%i
-echo ✓ Python найден: %PYTHON_VERSION%
-
-REM Проверка Tkinter в системе
+:: 2. Проверка Tkinter
 python -c "import tkinter" >nul 2>&1
 if errorlevel 1 (
-    echo.
-    echo ❌ Tkinter не установлен в системе
-    echo При переустановке Python выберите опцию:
-    echo   "Install tcl/tk and IDLE"
-    echo.
+    echo [X] Tkinter не установлен.
+    echo     Переустановите Python с опцией "tcl/tk"
     pause
     exit /b 1
 )
-echo ✓ Tkinter установлен в системе
+echo [+] Tkinter установлен
 
-REM Создание venv если не существует
-if not exist "%VENV_DIR%" (
-    echo.
-    echo → Создание виртуального окружения...
-    python -m venv "%VENV_DIR%"
-    if errorlevel 1 (
-        echo ❌ Не удалось создать venv
-        pause
-        exit /b 1
-    )
-    echo ✓ venv создан
+:: 3. Создание venv если нет
+if not exist "venv\Scripts\python.exe" (
+    echo [*] Виртуальное окружение не найдено — создаю...
+    python -m venv venv
+    echo [+] venv создан
 )
 
-REM Активация venv
-echo → Активирую venv...
-call "%ACTIVATE_SCRIPT%"
-
-REM Обновляем pip
-echo → Обновляю pip...
-"%PIP_BIN%" install --upgrade pip -q >nul 2>&1
-
-REM Проверка и установка зависимостей
+:: 4. Установка зависимостей
 if exist "requirements.txt" (
-    echo → Проверяю зависимости...
-    
-    REM Установка всех зависимостей тихо
-    "%PIP_BIN%" install -r requirements.txt -q 2>nul
-    if errorlevel 1 (
-        echo ✓ Зависимости проверены
-    ) else (
-        echo ✓ Зависимости установлены
-    )
-) else (
-    echo ⚠ requirements.txt не найден (это нормально)
+    echo [*] Устанавливаю зависимости...
+    call venv\Scripts\python.exe -m pip install --upgrade pip -q 2>nul
+    call venv\Scripts\pip.exe install -r requirements.txt -q 2>nul
+    echo [+] Зависимости готовы
 )
 
-REM Проверка Tkinter в venv
-"%PYTHON_BIN%" -c "import tkinter" >nul 2>&1
-if errorlevel 1 (
-    echo ⚠ Tkinter недоступен в venv
-    echo Используем системный Python с Tkinter
-)
-
-REM Финальная информация
 echo.
-echo ✓ Все компоненты готовы
-echo 🚀 Запускаю arqParse GUI...
+echo [+] Всё готово
+echo [^>] Запускаю arqParse GUI...
 echo ════════════════════════════════════════════════════════
 echo.
 
-REM Запуск GUI через venv Python
-"%PYTHON_BIN%" main.py --gui
-
-REM Если произошла ошибка, показываем паузу
-if errorlevel 1 (
-    echo.
-    echo ❌ Ошибка при запуске GUI
-    pause
-)
-
-exit /b 0
+:: Запуск GUI
+venv\Scripts\python.exe main.py --gui

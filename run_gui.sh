@@ -1,5 +1,6 @@
 #!/bin/bash
-# Скрипт запуска GUI на Linux/Mac с автоматической настройкой venv
+# Скрипт запуска arqParse GUI — полностью автономный.
+# При первом запуске создаёт venv, ставит зависимости, открывает GUI.
 
 set -e
 
@@ -7,102 +8,68 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 VENV_DIR="$SCRIPT_DIR/venv"
-PYTHON_BIN="$VENV_DIR/bin/python"
-PIP_BIN="$VENV_DIR/bin/pip"
+PYTHON_BIN="$VENV_DIR/bin/python3"
+PIP_BIN="$VENV_DIR/bin/pip3"
 
 # Цвета
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
-echo -e "${CYAN}  arqParse GUI - Запуск через venv${NC}"
+echo -e "${CYAN}  arqParse GUI — Запуск${NC}"
 echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
 echo ""
 
-# Проверка Python
+# 1. Проверка Python3
 if ! command -v python3 &> /dev/null; then
     echo -e "${RED}❌ Python3 не найден${NC}"
-    echo "Установите Python 3.7+ и попробуйте снова"
+    echo "Установите Python 3.8+ (python3)"
     exit 1
 fi
-
 PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
 echo -e "${GREEN}✓${NC} Python найден: $PYTHON_VERSION"
 
-# Проверка Tkinter в системе
+# 2. Проверка Tkinter
 if ! python3 -c "import tkinter" 2>/dev/null; then
-    echo -e "${RED}❌ Tkinter не установлен в системе${NC}"
+    echo -e "${RED}❌ Tkinter не установлен${NC}"
     echo ""
-    echo "Для установки используйте:"
+    echo "Установите одной из команд:"
     echo -e "  ${YELLOW}Ubuntu/Debian:${NC} sudo apt install python3-tk"
-    echo -e "  ${YELLOW}Fedora/CentOS:${NC} sudo yum install python3-tkinter"
-    echo -e "  ${YELLOW}macOS:${NC} brew install python-tk"
+    echo -e "  ${YELLOW}Fedora/CentOS:${NC} sudo dnf install python3-tkinter"
+    echo -e "  ${YELLOW}Arch:${NC}       sudo pacman -S tk"
+    echo -e "  ${YELLOW}macOS:${NC}      brew install python-tk"
     exit 1
 fi
-echo -e "${GREEN}✓${NC} Tkinter установлен в системе"
+echo -e "${GREEN}✓${NC} Tkinter установлен"
 
-# Создание venv если не существует
-if [ ! -d "$VENV_DIR" ]; then
-    echo -e "${YELLOW}→${NC} Создание виртуального окружения..."
+# 3. Создание venv если нет
+if [ ! -f "$PYTHON_BIN" ]; then
+    echo -e "${YELLOW}→${NC} Виртуальное окружение не найдено — создаю..."
     python3 -m venv "$VENV_DIR"
     echo -e "${GREEN}✓${NC} venv создан"
 fi
 
-# Активация venv и обновление pip
-echo -e "${YELLOW}→${NC} Активирую venv..."
-source "$VENV_DIR/bin/activate"
-
-# Обновляем pip
-echo -e "${YELLOW}→${NC} Обновляю pip..."
-pip install --upgrade pip -q 2>/dev/null || true
-
-# Проверка и установка зависимостей
+# 4. Установка зависимостей
 if [ -f "requirements.txt" ]; then
-    echo -e "${YELLOW}→${NC} Проверяю зависимости..."
-    
-    # Проверяем какие пакеты не установлены
-    MISSING_PACKAGES=""
-    while IFS= read -r package; do
-        # Пропускаем пустые строки и комментарии
-        [[ -z "$package" || "$package" =~ ^# ]] && continue
-        
-        # Получаем имя пакета без версии
-        PKG_NAME=$(echo "$package" | sed 's/[>=<].*//')
-        
-        if ! "$PIP_BIN" show "$PKG_NAME" &>/dev/null; then
-            MISSING_PACKAGES="$MISSING_PACKAGES $package"
-        fi
-    done < requirements.txt
-    
-    if [ -n "$MISSING_PACKAGES" ]; then
-        echo -e "${YELLOW}→${NC} Установка зависимостей..."
-        pip install $MISSING_PACKAGES -q 2>/dev/null || true
-        echo -e "${GREEN}✓${NC} Зависимости установлены"
-    else
-        echo -e "${GREEN}✓${NC} Все зависимости уже установлены"
-    fi
-else
-    echo -e "${YELLOW}⚠${NC} requirements.txt не найден (это нормально)"
+    echo -e "${YELLOW}→${NC} Устанавливаю зависимости..."
+    "$PIP_BIN" install --upgrade pip -q 2>/dev/null || true
+    "$PIP_BIN" install -r requirements.txt -q 2>/dev/null || true
+    echo -e "${GREEN}✓${NC} Зависимости готовы"
 fi
 
-# Проверка Tkinter в venv
-if ! "$PYTHON_BIN" -c "import tkinter" 2>/dev/null; then
-    echo -e "${RED}⚠ Tkinter недоступен в venv${NC}"
-    echo "Используем системный Python с Tkinter"
-    echo ""
+# 5. Проверка Xray (необязательно — только для тестирования)
+if [ ! -f "$SCRIPT_DIR/bin/xray" ]; then
+    echo -e "${YELLOW}⚠${NC} bin/xray не найден (нужен только для тестирования конфигов)"
 fi
 
-# Финальная информация
 echo ""
-echo -e "${GREEN}✓${NC} Все компоненты готовы"
+echo -e "${GREEN}✓${NC} Всё готово"
 echo -e "${CYAN}🚀 Запускаю arqParse GUI...${NC}"
 echo -e "${CYAN}════════════════════════════════════════════════════════${NC}"
 echo ""
 
-# Запуск GUI через venv Python
-"$PYTHON_BIN" main.py --gui
-
-exit 0
+# Запуск GUI
+exec "$PYTHON_BIN" main.py --gui
