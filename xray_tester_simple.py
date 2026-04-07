@@ -388,7 +388,9 @@ def test_batch(
     timeout: float = 6.0,
     required_count: int = None,
     max_ping_ms: float = None,
-    target_url: str = "https://www.google.com/generate_204"
+    target_url: str = "https://www.google.com/generate_204",
+    log_func: callable = None,
+    progress_func: callable = None,
 ) -> List[Tuple[str, bool, float]]:
     """Тестирует батч конфигов конкурентно. Задачи подаются батчами, чтобы stop_flag реально останавливал работу.
 
@@ -400,7 +402,20 @@ def test_batch(
         required_count: Количество рабочих конфигов с подходящим пингом, после которого остановиться.
                        Если None — тестирует все.
         max_ping_ms: Максимальный пинг. Если None — не фильтрует по пингу.
+        target_url: URL для тестирования
+        log_func: Функция логирования msg, tag — для GUI
+        progress_func: Функция прогресса current, total — для GUI
     """
+    def _log(msg, tag="info"):
+        if log_func:
+            log_func(msg, tag)
+        else:
+            print(msg)
+
+    def _progress(current, total):
+        if progress_func:
+            progress_func(current, total)
+
     if not urls:
         return []
 
@@ -411,7 +426,7 @@ def test_batch(
     stop_flag = threading.Event()
     BATCH_SIZE = concurrency * 2  # подаём с запасом 2x от concurrency
 
-    print(f"Тестирование {len(urls)} конфигов (concurrency={concurrency}, timeout={timeout}s)...")
+    _log(f"Тестирование {len(urls)} конфигов (concurrency={concurrency}, timeout={timeout}s)...", "info")
 
     with ThreadPoolExecutor(max_workers=concurrency) as executor:
         try:
@@ -438,6 +453,9 @@ def test_batch(
                             completed += 1
                             count = completed
 
+                        # Обновляем прогресс
+                        _progress(count, len(urls))
+
                         # Считаем рабочие и подходящие конфиги
                         all_working_count = sum(1 for r in results if r[1])
                         if max_ping_ms is not None:
@@ -445,16 +463,17 @@ def test_batch(
                         else:
                             suitable_count = all_working_count
 
-                        # Выводим прогресс
-                        if not stop_flag.is_set() and (count % 20 == 0 or count == len(urls)):
+                        # Логируем каждый 5-й конфиг или каждые 20 (для консоли)
+                        log_every = 5 if log_func else 20
+                        if not stop_flag.is_set() and (count % log_every == 0 or count == len(urls)):
                             batch_results = results[last_batch_start:count]
                             batch_pings = [r[2] for r in batch_results if r[1]]
                             min_ping = min(batch_pings) if batch_pings else 0
 
                             if max_ping_ms is not None:
-                                print(f"Progress: {count}/{len(urls)} - Working: {all_working_count} - Suitable: {suitable_count} - Min ping: {min_ping:.0f}ms")
+                                _log(f"Прогресс: {count}/{len(urls)} — Рабочих: {all_working_count} — Подходящих: {suitable_count} — Мин. пинг: {min_ping:.0f}мс", "info")
                             else:
-                                print(f"Progress: {count}/{len(urls)} - Working: {all_working_count} - Min ping: {min_ping:.0f}ms")
+                                _log(f"Прогресс: {count}/{len(urls)} — Рабочих: {all_working_count} — Мин. пинг: {min_ping:.0f}мс", "info")
 
                             last_batch_start = count
 
@@ -464,9 +483,10 @@ def test_batch(
                             min_ping = min(batch_pings) if batch_pings else 0
 
                             if max_ping_ms is not None:
-                                print(f"Progress: {count}/{len(urls)} - Working: {all_working_count} - Suitable: {suitable_count} - Min ping: {min_ping:.0f}ms")
+                                _log(f"Прогресс: {count}/{len(urls)} — Рабочих: {all_working_count} — Подходящих: {suitable_count} — Мин. пинг: {min_ping:.0f}мс", "info")
                             else:
-                                print(f"Progress: {count}/{len(urls)} - Working: {all_working_count} - Min ping: {min_ping:.0f}ms")
+                                _log(f"Прогресс: {count}/{len(urls)} — Рабочих: {all_working_count} — Мин. пинг: {min_ping:.0f}мс", "info")
+                            _log(f"Найдено достаточно конфигов ({required_count}), остановка", "success")
                             stop_flag.set()
                             break
 
@@ -475,7 +495,7 @@ def test_batch(
                             results.append((futures[future], False, 0.0))
 
         except KeyboardInterrupt:
-            print("\n[!] Прерывание...")
+            _log("\n[!] Прерывание...", "warning")
             stop_flag.set()
             time.sleep(0.2)
         finally:
@@ -495,8 +515,8 @@ def test_batch(
     suitable = sum(1 for url, success, latency in working if latency <= max_ping_ms) if max_ping_ms else all_working
 
     if max_ping_ms is not None:
-        print(f"Готово: {suitable}/{all_working} подходящих из рабочих")
+        _log(f"Готово: {suitable}/{all_working} подходящих из рабочих", "success")
     else:
-        print(f"Готово: {all_working}/{len(urls)} рабочих")
+        _log(f"Готово: {all_working}/{len(urls)} рабочих", "success")
 
     return working

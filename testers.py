@@ -77,7 +77,9 @@ def test_xray_configs(
             timeout=timeout_sec,
             required_count=required_count,
             max_ping_ms=max_ping_ms,
-            target_url=target_url
+            target_url=target_url,
+            log_func=log_func,
+            progress_func=progress_func,
         )
     except Exception as e:
         _log(f"Ошибка при тестировании: {str(e)}", "error")
