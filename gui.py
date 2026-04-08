@@ -1203,9 +1203,9 @@ class ArcParseGUI:
                         f"Подписка обновлена: {', '.join(msgs)}", "success"
                     ))
             except auth_module.AuthError as e:
-                self.root.after(0, lambda: self.log(f"Ошибка авторизации: {e}", "error"))
+                self.root.after(0, lambda e=e: self.log(f"Ошибка авторизации: {e}", "error"))
             except Exception as e:
-                self.root.after(0, lambda: self.log(f"Ошибка отправки: {e}", "error"))
+                self.root.after(0, lambda e=e: self.log(f"Ошибка отправки: {e}", "error"))
 
         threading.Thread(target=up, daemon=True).start()
 
