@@ -115,6 +115,19 @@ class TestReadConfigsFromFile:
         finally:
             os.unlink(path)
 
+    def test_glued_configs_are_split(self):
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            f.write("vless://a@h1:443?security=none#t1trojan://pass@h2:443#t2")
+            f.flush()
+            path = f.name
+        try:
+            configs = read_configs_from_file(path)
+            assert len(configs) == 2
+            assert configs[0].startswith("vless://")
+            assert configs[1].startswith("trojan://")
+        finally:
+            os.unlink(path)
+
 
 class TestReadMtprotoFromFile:
     def test_nonexistent_file(self):
@@ -152,5 +165,21 @@ class TestReadMtprotoFromFile:
         try:
             proxies = read_mtproto_from_file(path)
             assert proxies == []
+        finally:
+            os.unlink(path)
+
+    def test_glued_mtproto_are_split(self):
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            f.write(
+                "https://t.me/proxy?server=1.1.1.1&port=443&secret=a"
+                "https://t.me/proxy?server=2.2.2.2&port=8080&secret=b"
+            )
+            f.flush()
+            path = f.name
+        try:
+            proxies = read_mtproto_from_file(path)
+            assert len(proxies) == 2
+            assert "1.1.1.1" in proxies[0]
+            assert "2.2.2.2" in proxies[1]
         finally:
             os.unlink(path)
