@@ -462,7 +462,6 @@ def is_valid_vpn_config_url(line: str) -> bool:
 def apply_sni_cidr_filter(configs: List[str], filter_secure: bool = True) -> List[str]:
     """Apply SNI/CIDR filtering to configs, with optional secure filtering (PARALLEL)."""
     from config.settings import SNI_DOMAINS
-    from utils.file_utils import load_cidr_whitelist, is_ip_in_cidr_whitelist, extract_ip_from_config
     
     # Load CIDR whitelist
     cidr_whitelist = load_cidr_whitelist()
