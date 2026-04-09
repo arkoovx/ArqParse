@@ -61,3 +61,18 @@ def normalize_path(path: str) -> str:
             return res_path  # для результатов — всегда возвращаем, даже если ещё нет
 
     return path
+
+
+def normalize_task_paths(task: dict) -> dict:
+    """Нормализует все пути в задаче под текущую ОС."""
+    task = dict(task)  # копия
+
+    # raw_files
+    if 'raw_files' in task:
+        task['raw_files'] = [normalize_path(f) for f in task['raw_files']]
+
+    # out_file
+    if 'out_file' in task:
+        task['out_file'] = normalize_path(task['out_file'])
+
+    return task

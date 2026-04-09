@@ -70,10 +70,6 @@ if exist "%SCRIPT_DIR%requirements.txt" (
     echo [+] Зависимости готовы
 )
 
-:: 5. Проверка и установка Xray
-echo [*] Проверка Xray бинарника...
-"%PYTHON_EXE%" -c "from setup_xray import ensure_xray; ensure_xray()"
-
 echo.
 echo [+] Всё готово
 echo [^>] Запускаю arqParse GUI...
