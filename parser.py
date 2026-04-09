@@ -1,9 +1,19 @@
 """Модуль для парсинга VPN ссылок и MTProto прокси."""
 
+from __future__ import annotations
+
+import html
 import os
 import re
 from urllib.parse import parse_qs
-from typing import Optional, Dict, List
+from typing import Callable, Dict, List, Optional, Pattern
+
+# Предкомпилированные паттерны ускоряют повторные вызовы парсеров.
+# Важно: более "длинные" протоколы должны идти раньше коротких,
+# чтобы избежать частичных совпадений (например, hysteria2 до hysteria, ssr до ss).
+_CONFIG_START_PATTERN = re.compile(r"(vless|vmess|trojan|ssr|ss|hysteria2|hy2|hysteria|tuic)://")
+_MTPROTO_START_PATTERN = re.compile(r"(https://t\.me/proxy|tg://proxy)")
+_MTPROTO_EXTRACT_PATTERN = re.compile(r"(https://t\.me/proxy\?[^\s]+|tg://proxy[^\s]+)")
 
 
 def parse_mtproto_url(url: str) -> Optional[Dict]:
@@ -43,178 +53,105 @@ def parse_mtproto_url(url: str) -> Optional[Dict]:
         return None
 
 
-def read_configs_from_file(filepath: str) -> List[str]:
-    """
-    Читает конфиги из файла, пропускает пустые строки и комментарии.
-    Возвращает список строк с конфигами.
-    Корректно обрабатывает \r\n (Windows) и \n (Unix) окончания строк.
-    Разделяет склеенные конфиги (когда несколько URL соединены без переноса).
-    """
-    configs = []
-
+def _read_text_file(filepath: str) -> str:
+    """Безопасно читает файл и нормализует переносы строк."""
     if not os.path.exists(filepath):
-        return configs
+        return ""
+    with open(filepath, "r", encoding="utf-8") as f:
+        return f.read().replace("\r\n", "\n").replace("\r", "\n")
 
-    with open(filepath, 'r', encoding='utf-8') as f:
-        content = f.read()
 
-    # Нормализуем окончания строк (Windows \r\n -> Unix \n)
-    content = content.replace('\r\n', '\n').replace('\r', '\n')
+def _split_glued_entries(content: str, start_pattern: Pattern[str]) -> List[str]:
+    """Разделяет склеенные URL и склеивает переносы внутри одного URL."""
+    cleaned_lines: List[str] = []
+    current_line = ""
 
-    # Очищаем контент от HTML-сущностей и склеиваем разорванные строки
-    content = content.replace('&amp;', '&')
-    content = content.replace('&lt;', '<')
-    content = content.replace('&gt;', '>')
-    content = content.replace('&quot;', '"')
-    content = content.replace('&#39;', "'")
-
-    # Склеиваем разорванные строки и разделяем склеенные конфиги
-    lines = content.split('\n')
-    cleaned_lines = []
-    current_line = ''
-
-    # Важно: hysteria2 должен идти перед hysteria, ssr перед ss, чтобы избежать частичного совпадения
-    config_start_pattern = re.compile(r'(vless|vmess|trojan|ssr|ss|hysteria2|hy2|hysteria|tuic)://')
-
-    for line in lines:
-        stripped = line.strip()
+    for raw_line in content.split("\n"):
+        stripped = raw_line.strip()
         if not stripped:
             continue
 
-        # Проверяем, содержит ли строка начало нового конфига
-        # Если да - разделяем на несколько строк
-        matches = list(config_start_pattern.finditer(stripped))
-        
+        matches = list(start_pattern.finditer(stripped))
         if len(matches) > 1:
-            # Если есть накопленная строка - сохраняем
             if current_line:
                 cleaned_lines.append(current_line)
-                current_line = ''
-            
-            # Разделяем склеенные конфиги
-            for i, match in enumerate(matches):
+                current_line = ""
+            for index, match in enumerate(matches):
                 start = match.start()
-                if i + 1 < len(matches):
-                    end = matches[i + 1].start()
+                if index + 1 < len(matches):
+                    end = matches[index + 1].start()
                     cleaned_lines.append(stripped[start:end])
                 else:
-                    # Последний матч - начинаем новую накопленную строку
                     current_line = stripped[start:]
-        elif len(matches) == 1:
+            continue
+
+        if len(matches) == 1:
             match = matches[0]
             if match.start() == 0:
-                # Строка начинается с конфига
                 if current_line:
                     cleaned_lines.append(current_line)
                 current_line = stripped
             else:
-                # Конфиг в середине строки - это продолжение + новый конфиг
-                current_line += stripped[:match.start()]
+                current_line += stripped[: match.start()]
                 if current_line.strip():
                     cleaned_lines.append(current_line.strip())
-                current_line = stripped[match.start():]
-        else:
-            # Это продолжение предыдущей строки - склеиваем
-            current_line += stripped
+                current_line = stripped[match.start() :]
+            continue
 
-    # Не забываем последнюю строку
+        current_line += stripped
+
     if current_line:
         cleaned_lines.append(current_line)
+    return cleaned_lines
 
-    # Фильтруем конфиги
-    for line in cleaned_lines:
-        line = line.strip()
-        # Пропускаем пустые строки, комментарии и заголовки
-        if not line or line.startswith('#') or line.startswith('profile-'):
-            continue
-        configs.append(line)
 
-    return configs
+def _extract_items(lines: List[str], validator: Callable[[str], bool]) -> List[str]:
+    """Общая фильтрация строк."""
+    items: List[str] = []
+    for line in lines:
+        candidate = line.strip()
+        if candidate and validator(candidate):
+            items.append(candidate)
+    return items
+
+
+def read_configs_from_file(filepath: str) -> List[str]:
+    """
+    Читает конфиги из файла, пропускает пустые строки и комментарии.
+    Корректно обрабатывает переносы строк и разделяет склеенные URL.
+    """
+    content = _read_text_file(filepath)
+    if not content:
+        return []
+
+    # html.unescape покрывает &amp;, &lt;, &gt;, &quot;, &#39; и т.д.
+    normalized = html.unescape(content)
+    lines = _split_glued_entries(normalized, _CONFIG_START_PATTERN)
+    return _extract_items(
+        lines,
+        lambda item: not item.startswith("#") and not item.startswith("profile-"),
+    )
 
 
 def read_mtproto_from_file(filepath: str) -> List[str]:
     """
     Читает MTProto прокси из файла.
-    Возвращает список URL.
-    Корректно обрабатывает \r\n (Windows) и \n (Unix) окончания строк.
-    Разделяет склеенные прокси (когда несколько URL соединены без переноса).
+    Корректно обрабатывает переносы строк и разделяет склеенные URL.
     """
-    proxies = []
+    content = _read_text_file(filepath)
+    if not content:
+        return []
 
-    if not os.path.exists(filepath):
-        return proxies
+    normalized = html.unescape(content)
+    lines = _split_glued_entries(normalized, _MTPROTO_START_PATTERN)
 
-    with open(filepath, 'r', encoding='utf-8') as f:
-        content = f.read()
-
-    # Нормализуем окончания строк (Windows \r\n -> Unix \n)
-    content = content.replace('\r\n', '\n').replace('\r', '\n')
-
-    # Очищаем контент
-    content = content.replace('&amp;', '&')
-
-    # Разделяем склеенные прокси и склеиваем разорванные строки
-    lines = content.split('\n')
-    cleaned_lines = []
-    current_line = ''
-
-    # Паттерн для обнаружения начала MTProto URL
-    mtproto_start_pattern = re.compile(r'(https://t\.me/proxy|tg://proxy)')
-
+    proxies: List[str] = []
     for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-
-        # Проверяем, содержит ли строка начало нового MTProto URL
-        matches = list(mtproto_start_pattern.finditer(stripped))
-        
-        if len(matches) > 1:
-            # Если есть накопленная строка - сохраняем
-            if current_line:
-                cleaned_lines.append(current_line)
-                current_line = ''
-            
-            # Разделяем склеенные прокси
-            for i, match in enumerate(matches):
-                start = match.start()
-                if i + 1 < len(matches):
-                    end = matches[i + 1].start()
-                    cleaned_lines.append(stripped[start:end])
-                else:
-                    # Последний матч - начинаем новую накопленную строку
-                    current_line = stripped[start:]
-        elif len(matches) == 1:
-            match = matches[0]
-            if match.start() == 0:
-                # Строка начинается с прокси
-                if current_line:
-                    cleaned_lines.append(current_line)
-                current_line = stripped
-            else:
-                # Прокси в середине строки - это продолжение + новый прокси
-                current_line += stripped[:match.start()]
-                if current_line.strip():
-                    cleaned_lines.append(current_line.strip())
-                current_line = stripped[match.start():]
-        else:
-            # Это продолжение предыдущей строки - склеиваем
-            current_line += stripped
-
-    # Не забываем последнюю строку
-    if current_line:
-        cleaned_lines.append(current_line)
-
-    # Находим все MTProto ссылки сразу в cleaned_lines без промежуточного join
-    pattern = re.compile(r'(https://t\.me/proxy\?[^\s]+|tg://proxy[^\s]+)')
-
-    for line in cleaned_lines:
-        for m in pattern.findall(line):
-            m = m.strip()
-            if m and ('t.me/proxy' in m or 'tg://proxy' in m):
-                # Проверяем что есть обязательные параметры:
-                # без secret ссылка неполная и невалидна для подключения.
-                if 'server=' in m and 'port=' in m and 'secret=' in m:
-                    proxies.append(m)
-
+        for proxy in _MTPROTO_EXTRACT_PATTERN.findall(line):
+            candidate = proxy.strip()
+            if not candidate:
+                continue
+            # Без обязательных параметров ссылка невалидна для подключения.
+            if "server=" in candidate and "port=" in candidate and "secret=" in candidate:
+                proxies.append(candidate)
     return proxies
