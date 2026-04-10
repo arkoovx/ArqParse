@@ -54,7 +54,8 @@ def _request(server: str, method: str, path: str, data: dict = None,
             msg = err_json.get("detail", str(err_body))
         except json.JSONDecodeError:
             msg = err_body
-        raise AuthError(msg)
+        # Добавляем HTTP статус для большей информативности
+        raise AuthError(f"HTTP {e.code}: {msg}")
     except urllib.error.URLError as e:
         raise AuthError(f"Нет соединения с сервером: {e.reason}")
     except Exception as e:

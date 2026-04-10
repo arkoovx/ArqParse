@@ -1,35 +1,88 @@
-"""Kivy/KivyMD GUI для arqParse.
-
-Цели:
-- кроссплатформенный интерфейс (Windows/Linux/macOS/Android/iOS);
-- Material 3 визуальный стиль с закруглениями;
-- плавные анимации появления экранов и карточек.
-"""
+"""Kivy/KivyMD GUI для arqParse — Material 3, кроссплатформенный."""
 
 from __future__ import annotations
 
 import os
 import threading
-import traceback
+import webbrowser
 from typing import Dict, List
 
-# Важно: отключаем парсер аргументов Kivy, иначе флаг `--gui`
-# (который обрабатывается нашим argparse в main.py) вызывает ошибку
-# "option --gui not recognized" на старте приложения.
 os.environ.setdefault("KIVY_NO_ARGS", "1")
 
+from kivy.core.window import Window
 from kivy.animation import Animation
 from kivy.clock import Clock
 from kivy.core.clipboard import Clipboard
+from kivy.graphics import Color, RoundedRectangle
 from kivy.lang import Builder
+from kivy.metrics import dp
 from kivy.uix.screenmanager import FadeTransition, ScreenManager
 
 from kivymd.app import MDApp
 from kivymd.uix.boxlayout import MDBoxLayout
-from kivymd.uix.button import MDRaisedButton
+from kivymd.uix.button import MDRectangleFlatButton, MDFlatButton, MDIconButton
 from kivymd.uix.label import MDLabel
-from kivymd.uix.selectioncontrol import MDCheckbox
-from kivymd.uix.snackbar import Snackbar
+from kivymd.uix.progressbar import MDProgressBar
+from kivymd.uix.screen import MDScreen
+from kivymd.uix.scrollview import MDScrollView
+from kivymd.uix.textfield import MDTextField
+from kivymd.uix.toolbar import MDTopAppBar
+from kivymd.uix.selectioncontrol import MDSwitch, MDCheckbox
+
+from kivy.factory import Factory
+from kivy.uix.behaviors import ButtonBehavior
+
+
+class ClickableLabel(ButtonBehavior, MDLabel):
+    """Лейбл, который можно нажать."""
+    pass
+
+
+class NoAnimBtn(ButtonBehavior, MDBoxLayout):
+    """Кнопка без анимации при клике."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = "horizontal"
+        self.size_hint_y = None
+        self.height = dp(32)
+
+        self._text = kwargs.get("text", "")
+        self._label = MDLabel(
+            text=self._text,
+            halign="center",
+            valign="middle",
+            theme_text_color="Custom",
+            text_color=(1, 1, 1, 1),
+            font_size=dp(13),
+            size_hint=(1, 1)
+        )
+        self.add_widget(self._label)
+
+        with self.canvas.before:
+            Color(0.25, 0.15, 0.5, 1)
+            self._bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[7])
+            Color(0.35, 0.2, 0.65, 1)
+            self._rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[7])
+
+        self.bind(pos=self._upd_rect, size=self._upd_rect)
+
+    def _upd_rect(self, *args):
+        self._bg_rect.pos = self.pos
+        self._bg_rect.size = self.size
+        self._rect.pos = self.pos
+        self._rect.size = self.size
+
+    def _get_text(self):
+        return self._label.text
+
+    def _set_text(self, v):
+        self._label.text = v
+
+    text = property(_get_text, _set_text)
+
+
+Factory.register("ClickableLabel", cls=ClickableLabel)
+Factory.register("NoAnimBtn", cls=NoAnimBtn)
 
 import auth as auth_module
 from config import RESULTS_DIR, XRAY_BIN
@@ -39,306 +92,536 @@ from settings_manager import get_tasks, load_settings, save_settings
 from testers import test_xray_configs
 from testers_mtproto import test_mtproto_configs
 
+ACCENT = "#8b5cf6"
+TEXT = "#e4e4e7"
+TEXT_DIM = "#71717a"
+TEXT_MUTED = "#52525b"
+GREEN = "#22c55e"
+YELLOW = "#facc15"
+RED = "#ef4444"
+CARD_BG = (0.086, 0.086, 0.094, 1)
+BG = (0.05, 0.05, 0.05, 1)
+
 KV = r'''
 #:import dp kivy.metrics.dp
-#:import FadeTransition kivy.uix.screenmanager.FadeTransition
+
+<ClickableLabel>:
+    size_hint_y: None
+    height: dp(24)
+
+<ThemedCard@MDBoxLayout>:
+    orientation: "vertical"
+    size_hint_y: None
+    adaptive_height: True
+    spacing: dp(8)
+    padding: [dp(12), dp(10)]
+    canvas.before:
+        Color:
+            rgba: app.c_card
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [14, 14, 14, 14]
+
+<AccentBtn@MDRectangleFlatButton>:
+    size_hint_y: None
+    height: dp(42)
+    md_bg_color: app.c_accent
+    text_color: (1, 1, 1, 1)
+    line_color: app.c_accent
+
+<DimBtn@MDRectangleFlatButton>:
+    size_hint_y: None
+    height: dp(36)
+    text_color: app.c_dim
+    line_color: app.c_dim
+
+<SecBtn@MDFlatButton>:
+    size_hint_y: None
+    height: dp(32)
+    theme_text_color: "Custom"
+    text_color: app.c_accent
 
 <RootWidget>:
+    orientation: "vertical"
+
     ScreenManager:
-        id: screen_manager
-        transition: FadeTransition(duration=0.18)
+        id: sm
 
         MDScreen:
             name: "login"
-            md_bg_color: app.theme_cls.backgroundColor
+
             MDBoxLayout:
                 orientation: "vertical"
-                padding: dp(20)
+                padding: dp(24)
                 spacing: dp(16)
 
                 Widget:
 
-                MDCard:
-                    radius: [22, 22, 22, 22]
-                    padding: dp(20)
-                    elevation: 2
-                    md_bg_color: app.card_color
-                    orientation: "vertical"
-                    spacing: dp(14)
+                MDLabel:
+                    text: "arqParse"
+                    halign: "center"
+                    font_style: "H3"
+                    bold: True
+                    theme_text_color: "Custom"
+                    text_color: app.c_text
                     size_hint_y: None
-                    height: self.minimum_height
+                    height: dp(40)
 
-                    MDLabel:
-                        text: "arqParse"
-                        halign: "center"
-                        bold: True
-                        font_style: "Headline"
-                    MDLabel:
-                        text: "Тестирование VPN конфигов"
-                        halign: "center"
-                        theme_text_color: "Secondary"
+                MDLabel:
+                    text: "Тестирование VPN конфигов"
+                    halign: "center"
+                    theme_text_color: "Secondary"
+                    size_hint_y: None
+                    height: dp(24)
+
+                Widget:
+                    size_hint_y: None
+                    height: dp(20)
+
+                ThemedCard:
 
                     MDTextField:
                         id: login_user
                         hint_text: "Логин"
-                        mode: "outlined"
-                        radius: [16, 16, 16, 16]
+                        mode: "rectangle"
+                        size_hint_y: None
+                        height: dp(44)
 
                     MDTextField:
                         id: login_pass
                         hint_text: "Пароль"
-                        mode: "outlined"
                         password: True
-                        radius: [16, 16, 16, 16]
+                        mode: "rectangle"
+                        size_hint_y: None
+                        height: dp(44)
+                        on_text_validate: app.do_auth()
 
                     MDBoxLayout:
-                        adaptive_height: True
-                        spacing: dp(12)
-                        MDCheckbox:
-                            id: mode_register
-                            size_hint: None, None
-                            size: dp(32), dp(32)
-                            on_active: app.toggle_auth_mode("register", self.active)
-                        MDLabel:
-                            text: "Режим регистрации"
-                            valign: "middle"
+                        orientation: "horizontal"
+                        size_hint_y: None
+                        height: dp(36)
+                        padding: 0
+                        spacing: dp(2)
 
-                    MDRaisedButton:
+                        MDFlatButton:
+                            id: tab_login
+                            text: "Вход"
+                            size_hint_x: 0.5
+                            on_release: app.set_auth_mode("login")
+
+                        MDFlatButton:
+                            id: tab_register
+                            text: "Регистрация"
+                            size_hint_x: 0.5
+                            on_release: app.set_auth_mode("register")
+
+                    AccentBtn:
                         id: auth_btn
                         text: "Войти"
-                        pos_hint: {"center_x": .5}
+                        size_hint_x: 0.5
+                        pos_hint: {"center_x": 0.5}
                         on_release: app.do_auth()
+
+                Widget:
+
+                MDBoxLayout:
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: dp(24)
+                    padding: [0, 0, 0, 0]
+
+                    Widget:
+
+                    MDLabel:
+                        text: "by "
+                        theme_text_color: "Hint"
+                        size_hint_x: None
+                        width: dp(20)
+
+                    ClickableLabel:
+                        id: arq_link_label
+                        text: "arq"
+                        theme_text_color: "Custom"
+                        text_color: app.c_accent
+                        bold: True
+                        size_hint_x: None
+                        width: dp(30)
+                        on_release: app.open_channel_link()
+
+                    Widget:
 
                 Widget:
 
         MDScreen:
             name: "main"
-            md_bg_color: app.theme_cls.backgroundColor
+
             MDBoxLayout:
                 orientation: "vertical"
 
                 MDTopAppBar:
                     title: "arqParse"
-                    left_action_items: [["home", lambda x: app.switch_screen("main")]]
-                    right_action_items: [["cog", lambda x: app.switch_screen("settings")], ["logout", lambda x: app.logout()]]
+                    type: "top"
+                    anchor_title: "left"
+                    md_bg_color: app.c_bg
+                    left_action_items: []
+                    right_action_items: [["cog-outline", lambda x: app.switch_screen("settings")], ["logout-variant", lambda x: app.logout()]]
 
-                MDBoxLayout:
-                    orientation: "vertical"
-                    padding: dp(14)
-                    spacing: dp(12)
+                MDScrollView:
+                    do_scroll_x: False
+                    bar_width: dp(4)
 
-                    MDCard:
-                        radius: [18, 18, 18, 18]
-                        padding: dp(14)
-                        md_bg_color: app.card_color
+                    MDBoxLayout:
+                        id: main_content
                         orientation: "vertical"
-                        size_hint_y: None
-                        height: self.minimum_height
-                        spacing: dp(8)
+                        padding: [dp(14), dp(12)]
+                        spacing: dp(12)
+                        adaptive_height: True
 
-                        MDLabel:
-                            text: "Подписка"
-                            bold: True
-                        MDLabel:
-                            id: sub_url_label
-                            text: "Ссылка появится после входа"
-                            theme_text_color: "Secondary"
-                            shorten: True
-                            shorten_from: "right"
-                        MDRaisedButton:
-                            text: "Скопировать ссылку"
-                            on_release: app.copy_subscription_url()
+                        ThemedCard:
+                            id: sub_card
+                            spacing: dp(6)
 
-                    MDCard:
-                        radius: [18, 18, 18, 18]
-                        padding: dp(14)
-                        md_bg_color: app.card_color
-                        orientation: "vertical"
-                        size_hint_y: None
-                        height: self.minimum_height
-                        spacing: dp(10)
+                            MDLabel:
+                                text: "Подписка"
+                                bold: True
+                                theme_text_color: "Primary"
+                                size_hint_y: None
+                                height: dp(20)
 
-                        MDLabel:
-                            text: "Действия"
-                            bold: True
+                            MDLabel:
+                                id: sub_url_label
+                                text: "Ссылка появится после входа"
+                                theme_text_color: "Secondary"
+                                shorten: True
+                                shorten_from: "right"
+                                size_hint_y: None
+                                height: dp(16)
+
+                            DimBtn:
+                                text: "Скопировать ссылку"
+                                on_release: app.copy_subscription_url()
+
+                        ClickableLabel:
+                            id: bot_link_label
+                            text: "Применить тг прокси можно в боте [color=#a78bfa]@arqvpn_bot[/color]"
+                            theme_text_color: "Hint"
+                            size_hint_y: None
+                            height: dp(24)
+                            markup: True
+                            on_release: app.open_bot_link()
+
+                        AccentBtn:
+                            id: start_btn
+                            text: "Начать тест"
+                            size_hint_x: 0.85
+                            pos_hint: {"center_x": 0.5}
+                            height: dp(56)
+                            font_size: dp(18)
+                            on_release: app.start_full_test()
+
+                        NoAnimBtn:
+                            id: adv_btn
+                            text: "Дополнительные настройки"
+                            size_hint_x: 0.85
+                            pos_hint: {"center_x": 0.5}
+                            height: dp(32)
+                            on_release: app.toggle_advanced()
+
+                        ThemedCard:
+                            id: adv_container
+                            spacing: dp(8)
+
+                            MDLabel:
+                                text: "Выбрать задачи"
+                                theme_text_color: "Secondary"
+                                size_hint_y: None
+                                height: dp(18)
+
+                            MDBoxLayout:
+                                id: task_checkboxes
+                                orientation: "vertical"
+                                adaptive_height: True
+                                spacing: dp(2)
+
+                            MDBoxLayout:
+                                orientation: "horizontal"
+                                adaptive_height: True
+                                spacing: dp(6)
+                                size_hint_y: None
+                                height: dp(38)
+
+                                DimBtn:
+                                    text: "Скачать"
+                                    on_release: app.start_download()
+
+                                DimBtn:
+                                    text: "Результаты"
+                                    on_release: app.open_results()
 
                         MDBoxLayout:
-                            adaptive_height: True
-                            spacing: dp(10)
-                            MDRaisedButton:
-                                text: "Скачать"
-                                on_release: app.start_download()
-                            MDRaisedButton:
-                                text: "Полный тест"
-                                on_release: app.start_full_test()
-                            MDRaisedButton:
-                                text: "Стоп"
+                            orientation: "horizontal"
+                            size_hint_y: None
+                            height: dp(38)
+                            spacing: dp(8)
+
+                            DimBtn:
+                                id: skip_btn
+                                text: "Пропустить"
+                                disabled: True
+                                text_color: app.c_muted
+                                line_color: app.c_muted
+                                on_release: app.skip_file()
+
+                            DimBtn:
+                                id: stop_btn
+                                text: "Остановить"
+                                disabled: True
+                                text_color: app.c_muted
+                                line_color: app.c_muted
                                 on_release: app.stop_operation()
 
-                        MDProgressBar:
-                            id: progress
-                            value: 0
+                        ThemedCard:
+                            spacing: dp(4)
 
-                    MDCard:
-                        radius: [18, 18, 18, 18]
-                        padding: dp(12)
-                        md_bg_color: app.card_color
-                        orientation: "vertical"
-                        size_hint_y: None
-                        height: dp(160)
-
-                        MDLabel:
-                            text: "Лог"
-                            bold: True
-                            size_hint_y: None
-                            height: self.texture_size[1]
-
-                        ScrollView:
-                            do_scroll_x: False
-                            bar_width: dp(5)
-                            MDLabel:
-                                id: log_label
-                                text: "Готово к запуску"
+                            MDBoxLayout:
+                                orientation: "horizontal"
                                 adaptive_height: True
-                                theme_text_color: "Secondary"
-                                text_size: self.width, None
+                                size_hint_y: None
+                                height: dp(22)
+
+                                MDLabel:
+                                    text: "Прогресс:"
+                                    theme_text_color: "Secondary"
+                                    adaptive_width: True
+
+                                MDLabel:
+                                    id: progress_label
+                                    text: "Готов к работе"
+                                    theme_text_color: "Secondary"
+                                    halign: "right"
+
+                            MDProgressBar:
+                                id: progress
+                                value: 0
+                                max: 100
+                                size_hint_y: None
+                                height: dp(4)
+
+                        ThemedCard:
+                            spacing: dp(4)
+
+                            MDBoxLayout:
+                                orientation: "horizontal"
+                                adaptive_height: True
+                                size_hint_y: None
+                                height: dp(22)
+
+                                MDLabel:
+                                    text: "Журнал событий"
+                                    bold: True
+                                    theme_text_color: "Secondary"
+
+                                Widget:
+
+                                MDIconButton:
+                                    icon: "broom"
+                                    user_font_size: dp(16)
+                                    theme_text_color: "Custom"
+                                    text_color: app.c_muted
+                                    size_hint: None, None
+                                    size: dp(24), dp(24)
+                                    on_release: app.clear_log()
+
+                            MDScrollView:
+                                do_scroll_x: False
+                                size_hint_y: None
+                                height: dp(140)
+
+                                MDLabel:
+                                    id: log_label
+                                    text: "> arqParse запущен"
+                                    theme_text_color: "Custom"
+                                    text_color: app.c_text
+                                    size_hint_y: None
+                                    adaptive_height: True
+
+                        Widget:
+                            size_hint_y: None
+                            height: dp(16)
 
         MDScreen:
             name: "settings"
-            md_bg_color: app.theme_cls.backgroundColor
+
             MDBoxLayout:
                 orientation: "vertical"
 
                 MDTopAppBar:
                     title: "Настройки"
+                    type: "top"
+                    anchor_title: "left"
+                    md_bg_color: app.c_bg
                     left_action_items: [["arrow-left", lambda x: app.switch_screen("main")]]
 
-                ScrollView:
+                MDScrollView:
                     do_scroll_x: False
+                    bar_width: dp(4)
+
                     MDBoxLayout:
-                        id: settings_root
+                        id: settings_content
                         orientation: "vertical"
+                        padding: [dp(14), dp(12)]
                         spacing: dp(12)
-                        padding: dp(14)
                         adaptive_height: True
 
-                        MDCard:
-                            radius: [18, 18, 18, 18]
-                            padding: dp(14)
-                            md_bg_color: app.card_color
-                            orientation: "vertical"
-                            adaptive_height: True
+                        ThemedCard:
                             spacing: dp(10)
 
                             MDLabel:
                                 text: "Общие"
                                 bold: True
+                                theme_text_color: "Primary"
+                                size_hint_y: None
+                                height: dp(20)
 
                             MDTextField:
                                 id: user_agent
                                 hint_text: "User-Agent"
-                                mode: "outlined"
-                                radius: [16, 16, 16, 16]
+                                mode: "rectangle"
+                                size_hint_y: None
+                                height: dp(44)
+                                font_size: dp(14)
 
-                            MDRaisedButton:
-                                text: "Сохранить настройки"
+                            AccentBtn:
+                                text: "Сохранить"
                                 on_release: app.save_settings_from_ui()
 
-                        MDCard:
-                            radius: [18, 18, 18, 18]
-                            padding: dp(14)
-                            md_bg_color: app.card_color
+                        MDLabel:
+                            text: "Категории"
+                            bold: True
+                            theme_text_color: "Custom"
+                            text_color: app.c_accent
+                            size_hint_y: None
+                            height: dp(22)
+
+                        MDBoxLayout:
+                            id: categories_box
                             orientation: "vertical"
+                            spacing: dp(10)
                             adaptive_height: True
-                            spacing: dp(8)
-                            MDLabel:
-                                text: "Задачи для теста"
-                                bold: True
-                            MDBoxLayout:
-                                id: tasks_box
-                                orientation: "vertical"
-                                adaptive_height: True
-                                spacing: dp(8)
+
+                        SecBtn:
+                            text: "+ Добавить категорию"
+                            on_release: app.add_category()
+
+                        Widget:
+                            size_hint_y: None
+                            height: dp(16)
 '''
 
 
 class RootWidget(MDBoxLayout):
-    """Корневой виджет приложения."""
+    pass
 
 
 class KivyGUIApp(MDApp):
     def build(self):
         self.title = "arqParse"
+        # Формат 9:16 — 420x800
+        Window.size = (420, 800)
+        Window.resizable = True
         self.theme_cls.theme_style = "Dark"
-        self.theme_cls.primary_palette = "DeepPurple"
-        # Material 3 тема (доступно в актуальных KivyMD сборках).
         try:
             self.theme_cls.material_style = "M3"
         except Exception:
             pass
 
-        self.card_color = (0.10, 0.10, 0.12, 1)
+        self.c_text = (0.894, 0.894, 0.898, 1)
+        self.c_accent = (0.545, 0.361, 0.965, 1)
+        self.c_dim = (0.443, 0.443, 0.478, 1)
+        self.c_muted = (0.322, 0.322, 0.357, 1)
+        self.c_card = (0.086, 0.086, 0.094, 1)
+        self.c_bg = (0.05, 0.05, 0.05, 1)
+
+        self.advanced_open = False
         self._is_running = False
         self._stop_event = threading.Event()
-        self._task_checks: Dict[str, MDCheckbox] = {}
+        self._task_checks: Dict[str, dict] = {}
+        self._category_cards: List[dict] = []
+        self._loading_active = False
+        self._auth_mode = "login"  # "login" or "register"
 
-        # Сначала загружаем KV-правила, затем явно создаём корневой виджет.
-        # Важно: в KV у нас class-rule `<RootWidget>: ...`, а не root-правило `RootWidget:`.
-        # Поэтому Builder.load_string(KV) сам по себе может вернуть None.
         Builder.load_string(KV)
         return RootWidget()
 
     def on_start(self):
-        # Здесь self.root уже выставлен Kivy, можно безопасно обращаться к ids.
+        self.root.ids.sm.transition = FadeTransition(duration=0.18)
         self._load_initial_state()
-        self.switch_screen("login" if not auth_module.is_logged_in() else "main")
-        self._animate_cards()
+        logged = auth_module.is_logged_in()
+        self.switch_screen("login" if not logged else "main")
+        if logged:
+            self._refresh_sub_url()
+        # Инициализация табов авторизации
+        self._init_auth_tabs()
+        # Hover-эффект для ссылок
+        lbl = self.root.ids.bot_link_label
+        lbl.bind(on_enter=lambda *_: setattr(lbl, 'text_color', (0.75, 0.55, 1, 1)))
+        lbl.bind(on_leave=lambda *_: setattr(lbl, 'text_color', (0.44, 0.44, 0.48, 1)))
+        # Hover-эффект для arq (канал)
+        arq_lbl = self.root.ids.arq_link_label
+        arq_lbl.bind(on_enter=lambda *_: setattr(arq_lbl, 'text_color', (0.75, 0.55, 1, 1)))
+        arq_lbl.bind(on_leave=lambda *_: setattr(arq_lbl, 'text_color', self.c_accent))
+
+    def _init_auth_tabs(self):
+        self.set_auth_mode("login")
+
+    def set_auth_mode(self, mode: str):
+        """Переключение между вкладками Вход/Регистрация."""
+        self._auth_mode = mode
+        tab_login = self.root.ids.tab_login
+        tab_register = self.root.ids.tab_register
+        if mode == "login":
+            tab_login.md_bg_color = self.c_accent
+            tab_login.text_color = (1, 1, 1, 1)
+            tab_login.line_color = self.c_accent
+            tab_login.font_size = dp(13)
+            tab_register.md_bg_color = (0, 0, 0, 0)
+            tab_register.text_color = self.c_dim
+            tab_register.line_color = (0.2, 0.2, 0.2, 1)
+            tab_register.font_size = dp(12)
+            self.root.ids.auth_btn.text = "Войти"
+        else:
+            tab_register.md_bg_color = self.c_accent
+            tab_register.text_color = (1, 1, 1, 1)
+            tab_register.line_color = self.c_accent
+            tab_register.font_size = dp(13)
+            tab_login.md_bg_color = (0, 0, 0, 0)
+            tab_login.text_color = self.c_dim
+            tab_login.line_color = (0.2, 0.2, 0.2, 1)
+            tab_login.font_size = dp(12)
+            self.root.ids.auth_btn.text = "Зарегистрироваться"
 
     def _load_initial_state(self):
         settings = load_settings()
         self.tasks = get_tasks()
-
         self.root.ids.user_agent.text = settings.get("user_agent", "")
-        self._render_task_toggles()
-
-        if auth_module.is_logged_in():
-            self._refresh_sub_url()
-
-    def _render_task_toggles(self):
-        box = self.root.ids.tasks_box
-        box.clear_widgets()
-        self._task_checks.clear()
-
-        for task in self.tasks:
-            row = MDBoxLayout(adaptive_height=True, spacing=10)
-            check = MDCheckbox(active=True)
-            self._task_checks[task["name"]] = check
-            row.add_widget(check)
-            row.add_widget(MDLabel(text=f"{task['name']} ({task['type']})"))
-            box.add_widget(row)
-
-    def _animate_cards(self):
-        manager: ScreenManager = self.root.ids.screen_manager
-        screen = manager.current_screen
-        for child in screen.walk(restrict=True):
-            if isinstance(child, MDRaisedButton):
-                anim = Animation(opacity=1, d=0.15)
-                child.opacity = 0
-                anim.start(child)
+        self._render_task_checkboxes()
+        self._render_categories()
+        # Убираем adv_container из дерева при старте
+        parent = self.root.ids.main_content
+        if self.root.ids.adv_container.parent is not None:
+            parent.remove_widget(self.root.ids.adv_container)
 
     def switch_screen(self, name: str):
-        self.root.ids.screen_manager.current = name
-        Clock.schedule_once(lambda *_: self._animate_cards(), 0)
+        sm = self.root.ids.sm
+        if sm.current != name:
+            sm.current = name
 
-    def toggle_auth_mode(self, mode: str, active: bool):
-        if not active:
-            return
-        self.root.ids.auth_btn.text = "Зарегистрироваться" if mode == "register" else "Войти"
-
+    # ─── Авторизация ───────────────────────────────────────────
     def do_auth(self):
         username = self.root.ids.login_user.text.strip()
         password = self.root.ids.login_pass.text
-        is_register = self.root.ids.mode_register.active
+        is_register = self._auth_mode == "register"
 
         if len(username) < 3:
             self._toast("Логин минимум 3 символа")
@@ -347,195 +630,680 @@ class KivyGUIApp(MDApp):
             self._toast("Пароль минимум 6 символов")
             return
 
-        self.root.ids.auth_btn.disabled = True
-        self.root.ids.auth_btn.text = "Подключение..."
+        btn = self.root.ids.auth_btn
+        btn.disabled = True
+        self._loading_active = True
+        self._loading_dots = 0
+        self._loading_text = "Подключение" if not is_register else "Регистрация"
+        self._animate_dots(btn)
 
         def worker():
+            err_msg = None
             try:
+                server = auth_module.DEFAULT_SERVER
+                if not auth_module.check_server(server):
+                    err_msg = "Сервер недоступен"
+                    return
                 if is_register:
-                    auth_module.register(username, password)
+                    auth_module.register(username, password, server)
                 else:
-                    auth_module.login(username, password)
-                Clock.schedule_once(lambda *_: self._on_auth_ok(), 0)
+                    auth_module.login(username, password, server)
+                Clock.schedule_once(lambda *_: self._auth_ok(btn), 0)
             except Exception as exc:
-                Clock.schedule_once(lambda *_: self._on_auth_fail(str(exc)), 0)
+                err_msg = str(exc)
+            
+            if err_msg:
+                Clock.schedule_once(lambda *_: self._auth_fail(btn, err_msg), 0)
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _on_auth_ok(self):
-        self.root.ids.auth_btn.disabled = False
-        self.root.ids.auth_btn.text = "Войти"
+    def _animate_dots(self, btn):
+        if not self._loading_active:
+            return
+        dots = "." * (self._loading_dots % 4)
+        btn.text = f"{self._loading_text}{dots}"
+        self._loading_dots += 1
+        Clock.schedule_once(lambda *_: self._animate_dots(btn), 0.5)
+
+    def _auth_ok(self, btn):
+        self._loading_active = False
+        btn.disabled = False
+        btn.text = "Войти"
         self._refresh_sub_url()
         self.switch_screen("main")
         self._toast("Успешный вход")
 
-    def _on_auth_fail(self, message: str):
-        self.root.ids.auth_btn.disabled = False
-        self.root.ids.auth_btn.text = "Войти"
-        self._toast(f"Ошибка авторизации: {message}")
+    def _auth_fail(self, btn, msg: str):
+        self._loading_active = False
+        btn.disabled = False
+        # Восстанавливаем текст кнопки в зависимости от режима
+        btn.text = "Войти" if self._auth_mode == "login" else "Зарегистрироваться"
+        
+        # Показываем диалог с ошибкой для большей наглядности
+        self._show_error_dialog("Ошибка авторизации", msg)
+        self._log(f"Ошибка авторизации: {msg}", "error")
 
     def _refresh_sub_url(self):
         try:
-            self.root.ids.sub_url_label.text = auth_module.get_sub_url()
+            url = auth_module.get_sub_url()
+            self.root.ids.sub_url_label.text = url
         except Exception:
             self.root.ids.sub_url_label.text = "Ссылка недоступна"
 
     def copy_subscription_url(self):
         text = self.root.ids.sub_url_label.text
-        Clipboard.copy(text)
-        self._toast("Ссылка скопирована")
+        if text and "появится" not in text:
+            Clipboard.copy(text)
+            self._toast("Скопировано")
 
+    def open_bot_link(self, *args):
+        webbrowser.open("https://t.me/arqvpn_bot")
+
+    def open_channel_link(self, *args):
+        webbrowser.open("https://t.me/arqhub")
+
+    # ─── Настройки ─────────────────────────────────────────────
     def save_settings_from_ui(self):
         data = load_settings()
         data["user_agent"] = self.root.ids.user_agent.text.strip()
+        tasks = []
+        for card in self._category_cards:
+            name = card['name_input'].text.strip()
+            if not name:
+                continue
+            urls = [r['input'].text.strip() for r in card['url_rows'] if r['input'].text.strip()]
+            if not urls:
+                continue
+            try:
+                max_ping = int(card['max_ping'].text.strip() or "9000")
+            except ValueError:
+                max_ping = 9000
+            try:
+                req_count = int(card['req_count'].text.strip() or "10")
+            except ValueError:
+                req_count = 10
+            from config import RAW_CONFIGS_DIR
+            raw_files = []
+            for u in urls:
+                fname = u.split("/")[-1].split("?")[0]
+                if fname:
+                    raw_files.append(os.path.join(RAW_CONFIGS_DIR, fname))
+            profile = card['profile'].text.strip()
+            out_name = name.lower().replace(' ', '_')
+            tasks.append({
+                "name": name, "type": card['type_var'], "urls": urls,
+                "raw_files": raw_files,
+                "target_url": card['target'].text.strip() or "https://google.com",
+                "max_ping_ms": max_ping, "required_count": req_count,
+                "profile_title": profile,
+                "out_file": os.path.join(RESULTS_DIR, f"top_{out_name}.txt"),
+            })
+        if tasks:
+            data["tasks"] = tasks
         save_settings(data)
-        self._toast("Настройки сохранены")
+        self.tasks = get_tasks()
+        self._render_task_checkboxes()
+        self._toast("Сохранено")
 
-    def logout(self):
-        auth_module.clear_session()
-        self.switch_screen("login")
-        self._toast("Вы вышли из аккаунта")
+    # ─── Чекбоксы ──────────────────────────────────────────────
+    def _render_task_checkboxes(self):
+        box = self.root.ids.task_checkboxes
+        box.clear_widgets()
+        self._task_checks.clear()
+        for task in self.tasks:
+            row = MDBoxLayout(orientation="horizontal", adaptive_height=True,
+                              spacing=dp(8), size_hint_y=None, height=dp(28))
+            check = MDCheckbox(active=True, size_hint=(None, None), size=(dp(24), dp(24)))
+            self._task_checks[task["name"]] = {"check": check, "task": task}
+            row.add_widget(check)
+            row.add_widget(MDLabel(text=f"{task['name']} ({task['type']})",
+                                   theme_text_color="Primary",
+                                   size_hint_y=None, height=dp(24)))
+            box.add_widget(row)
 
+    # ─── Категории ─────────────────────────────────────────────
+    def _render_categories(self):
+        box = self.root.ids.categories_box
+        box.clear_widgets()
+        self._category_cards.clear()
+        settings = load_settings()
+        for td in settings.get("tasks", []):
+            self._add_category_card(td)
+
+    def _update_card_canvas(self, widget):
+        for instr in widget.canvas.before.children[:]:
+            if isinstance(instr, RoundedRectangle):
+                instr.pos = widget.pos
+                instr.size = widget.size
+                break
+
+    def _mk_input(self, hint="", height=dp(40), text=""):
+        w = MDTextField(hint_text=hint, mode="rectangle", size_hint_y=None,
+                        height=height, font_size=dp(15), multiline=False)
+        w.text = text
+        return w
+
+    def _mk_small(self, width, hint="", text=""):
+        w = MDTextField(hint_text=hint, mode="rectangle", size_hint_x=None, width=width,
+                        height=dp(40), font_size=dp(15), multiline=False)
+        w.text = text
+        return w
+
+    def _add_category_card(self, data=None):
+        if data is None:
+            data = {"name": "", "type": "xray", "urls": [""], "target_url": "https://google.com",
+                    "max_ping_ms": 9000, "required_count": 10, "profile_title": ""}
+
+        box = self.root.ids.categories_box
+        card = {'type_var': data.get("type", "xray"), 'url_rows': [], 'type_btns': []}
+
+        frame = MDBoxLayout(orientation="vertical", size_hint_y=None,
+                            adaptive_height=True, spacing=dp(10),
+                            padding=[dp(14), dp(12)])
+        with frame.canvas.before:
+            Color(*self.c_card)
+            RoundedRectangle(pos=frame.pos, size=frame.size, radius=[14, 14, 14, 14])
+        frame.bind(pos=lambda inst, val: self._update_card_canvas(frame),
+                   size=lambda inst, val: self._update_card_canvas(frame))
+
+        name_input = self._mk_input("Название категории", dp(44), data.get("name", ""))
+        card['name_input'] = name_input
+        frame.add_widget(name_input)
+
+        # Тип
+        type_row = MDBoxLayout(orientation="horizontal", adaptive_height=True,
+                               spacing=dp(6), size_hint_y=None, height=dp(36))
+        type_lbl = MDLabel(text="Тип:", theme_text_color="Secondary",
+                            size_hint_x=None, adaptive_width=True)
+        type_row.add_widget(type_lbl)
+
+        def make_btn(val, text):
+            is_active = card['type_var'] == val
+            btn = MDFlatButton(text=text, theme_text_color="Custom",
+                               text_color=(1,1,1,1) if is_active else self.c_muted,
+                               md_bg_color=self.c_accent if is_active else (0.1,0.1,0.11,1),
+                               size_hint_y=None, height=dp(28))
+            def _switch(*_):
+                card['type_var'] = val
+                for b in card['type_btns']:
+                    a = card['type_var'] == b._val
+                    b.md_bg_color = self.c_accent if a else (0.1,0.1,0.11,1)
+                    b.text_color = (1,1,1,1) if a else self.c_muted
+            btn.bind(on_release=_switch)
+            btn._val = val
+            type_row.add_widget(btn)
+            card['type_btns'].append(btn)
+
+        make_btn("xray", "Xray")
+        make_btn("mtproto", "MTProto")
+        frame.add_widget(type_row)
+
+        frame.add_widget(MDLabel(text="Источники (URL):", theme_text_color="Secondary",
+                                 bold=True, size_hint_y=None, height=dp(18)))
+
+        url_container = MDBoxLayout(orientation="vertical", adaptive_height=True, spacing=dp(14))
+        frame.add_widget(url_container)
+
+        for url in data.get("urls", [""]):
+            self._add_url_row(url_container, card, url)
+
+        add_url = MDFlatButton(text="+ Добавить URL", theme_text_color="Custom",
+                               text_color=self.c_accent, size_hint_y=None, height=dp(24))
+        add_url.bind(on_release=lambda *_: self._add_url_row(url_container, card, ""))
+        frame.add_widget(add_url)
+
+        target = self._mk_input("Целевой URL", dp(40), data.get("target_url", "https://google.com"))
+        card['target'] = target
+        frame.add_widget(target)
+
+        nums = MDBoxLayout(orientation="horizontal", adaptive_height=True, spacing=dp(6),
+                           size_hint_y=None, height=dp(38))
+        ping_lbl = MDLabel(text="Макс.пинг:", theme_text_color="Secondary",
+                           size_hint_x=None, adaptive_width=True)
+        nums.add_widget(ping_lbl)
+        mp = self._mk_small(dp(65), "мс.", str(data.get("max_ping_ms", 9000)))
+        card['max_ping'] = mp
+        nums.add_widget(mp)
+        req_lbl = MDLabel(text="Мин.кол-во:", theme_text_color="Secondary",
+                          size_hint_x=None, adaptive_width=True)
+        nums.add_widget(req_lbl)
+        rc = self._mk_small(dp(55), "шт.", str(data.get("required_count", 10)))
+        card['req_count'] = rc
+        nums.add_widget(rc)
+        frame.add_widget(nums)
+
+        profile = self._mk_input("Имя профиля", dp(40), data.get("profile_title", ""))
+        card['profile'] = profile
+        frame.add_widget(profile)
+
+        del_btn = MDFlatButton(text="Удалить", theme_text_color="Custom", text_color=(0.937,0.267,0.267,1),
+                               size_hint_y=None, height=dp(26))
+        def _delete(*_):
+            if card in self._category_cards:
+                self._category_cards.remove(card)
+            box.remove_widget(frame)
+        del_btn.bind(on_release=_delete)
+        frame.add_widget(del_btn)
+
+        box.add_widget(frame)
+        self._category_cards.append(card)
+
+    def _add_url_row(self, container, card, url=""):
+        row = MDBoxLayout(orientation="horizontal", size_hint_y=None, height=dp(52), spacing=dp(8),
+                          padding=[0, dp(3)])
+        row.add_widget(MDLabel(text=">", theme_text_color="Secondary",
+                                size_hint_x=None, width=dp(16)))
+        inp = self._mk_input("URL", dp(48), url)
+        row.add_widget(inp)
+        del_btn = MDIconButton(icon="close", user_font_size=dp(14), theme_text_color="Custom",
+                               text_color=self.c_muted, size_hint=(None, None), size=(dp(24), dp(24)))
+        def _remove(*_):
+            container.remove_widget(row)
+            card['url_rows'] = [r for r in card['url_rows'] if r['input'] != inp]
+        del_btn.bind(on_release=_remove)
+        row.add_widget(del_btn)
+        card['url_rows'].append({'input': inp, 'row': row})
+        container.add_widget(row)
+
+    def add_category(self):
+        self._add_category_card()
+
+    # ─── Advanced toggle ───────────────────────────────────────
+    def _adv_idx(self):
+        """Индекс для вставки adv_container (сразу после adv_btn)."""
+        parent = self.root.ids.main_content
+        for i, child in enumerate(parent.children):
+            if child == self.root.ids.adv_btn:
+                return i
+        return 0
+
+    def toggle_advanced(self):
+        self.advanced_open = not self.advanced_open
+        c = self.root.ids.adv_container
+        btn = self.root.ids.adv_btn
+        parent = self.root.ids.main_content
+
+        if self.advanced_open:
+            btn.text = "Скрыть настройки"
+            # Вставляем перед adv_btn
+            idx = self._adv_idx()
+            if c.parent is None:
+                parent.add_widget(c, idx)
+            c.height = 0
+            c.opacity = 0
+            # Сначала даём layout пересчитать minimum_height
+            Clock.schedule_once(lambda dt: self._expand_adv(c), 0.02)
+        else:
+            btn.text = "Дополнительные настройки"
+            anim = Animation(opacity=0, d=0.2)
+            anim.bind(on_complete=lambda *_: self._collapse_adv(c))
+            anim.start(c)
+
+    def _expand_adv(self, c):
+        c.height = c.minimum_height
+        Animation(opacity=1, d=0.2).start(c)
+
+    def _collapse_adv(self, c):
+        c.height = 0
+        c.opacity = 0
+        # Убираем из дерева чтобы не мешал кликам
+        if c.parent is not None:
+            c.parent.remove_widget(c)
+
+    # ─── Лог ───────────────────────────────────────────────────
+    def clear_log(self):
+        self.root.ids.log_label.text = ""
+
+    def _log(self, message: str, tag: str = "info"):
+        skip = ("Тестирование ", "Тестирую ")
+        if any(message.startswith(p) for p in skip):
+            return
+        # Заменяем эмодзи на ASCII — SDL2 шрифт их не поддерживает
+        message = message.replace("✓", "+").replace("✗", "!").replace("✘", "!")
+        message = message.replace("~", "~")
+        icons = {"success": "+", "warning": "~", "error": "!", "info": "i", "title": ">"}
+        icon = icons.get(tag, "i")
+        lbl = self.root.ids.log_label
+        lbl.text = f"{lbl.text}\n{icon} {message}" if lbl.text else f"{icon} {message}"
+        lbl.text = lbl.text[-4000:]
+
+    def _threadsafe_log(self, msg: str, tag: str = "info"):
+        Clock.schedule_once(lambda *_: self._log(msg, tag), 0)
+
+    # ─── Прогресс ──────────────────────────────────────────────
+    def _set_progress(self, value: float):
+        self.root.ids.progress.value = max(0, min(100, value))
+
+    def update_progress(self, current, total, suitable=0, required=0):
+        if required > 0:
+            pct = min(suitable / required, 1.0)
+            self.root.ids.progress_label.text = f"{suitable}/{required} ({int(pct*100)}%)"
+        elif total > 0:
+            pct = current / total
+            self.root.ids.progress_label.text = f"{int(pct*100)}%"
+        else:
+            pct = 0
+        self._set_progress(pct)
+
+    def _threadsafe_progress(self, current, total, *_):
+        if total <= 0:
+            return
+        Clock.schedule_once(lambda *_: self._set_progress((current / total) * 100), 0)
+
+    # ─── Кнопки ────────────────────────────────────────────────
+    def _enable_control_buttons(self, running: bool):
+        stop = self.root.ids.stop_btn
+        skip = self.root.ids.skip_btn
+        if running:
+            stop.disabled = False
+            stop.text_color = RED
+            stop.line_color = RED
+            skip.disabled = False
+            skip.text_color = YELLOW
+            skip.line_color = YELLOW
+        else:
+            stop.disabled = True
+            stop.text_color = self.c_muted
+            stop.line_color = self.c_muted
+            skip.disabled = True
+            skip.text_color = self.c_muted
+            skip.line_color = self.c_muted
+        self.root.ids.start_btn.disabled = running
+
+    # ─── Скачивание ────────────────────────────────────────────
     def start_download(self):
         if self._is_running:
             self._toast("Операция уже выполняется")
             return
-
         self._is_running = True
         self._stop_event.clear()
-        self._log("Старт скачивания конфигов")
+        self._enable_control_buttons(True)
+        self.root.ids.progress_label.text = "Скачивание..."
+        self._set_progress(0)
+        self._log("Скачивание конфигов...", "title")
 
         def worker():
             try:
-                results = download_all_tasks(self.tasks, max_age_hours=24, force=True, log_func=self._threadsafe_log)
-                self._threadsafe_log(f"Скачано: {len(results['downloaded'])}", "success")
-                if results["failed"]:
-                    self._threadsafe_log(f"Ошибок: {len(results['failed'])}", "error")
-            except Exception:
-                self._threadsafe_log(traceback.format_exc(), "error")
+                results = download_all_tasks(self.tasks, max_age_hours=24, force=False, log_func=self._threadsafe_log)
+                d, s, f = len(results.get('downloaded',[])), len(results.get('skipped',[])), len(results.get('failed',[]))
+                if d: self._threadsafe_log(f"Скачано: {d}", "success")
+                if s: self._threadsafe_log(f"Пропущено: {s}")
+                if f: self._threadsafe_log(f"Ошибок: {f}", "error")
+            except Exception as e:
+                self._threadsafe_log(str(e), "error")
             finally:
-                Clock.schedule_once(lambda *_: self._finish_operation(), 0)
+                Clock.schedule_once(lambda *_: self._finish_op(), 0)
 
         threading.Thread(target=worker, daemon=True).start()
 
+    # ─── Тест ──────────────────────────────────────────────────
     def start_full_test(self):
         if self._is_running:
-            self._toast("Операция уже выполняется")
+            self._toast("Тест уже запущен")
             return
-
-        selected = [t for t in self.tasks if self._task_checks.get(t["name"]) and self._task_checks[t["name"]].active]
-        if not selected:
+        sel = [d['task'] for d in self._task_checks.values() if d['check'].active]
+        if not sel:
             self._toast("Выберите хотя бы одну задачу")
             return
-
         self._is_running = True
         self._stop_event.clear()
+        self._enable_control_buttons(True)
         self._set_progress(0)
-        self._log(f"Запуск полного теста: {len(selected)} задач")
+        self.root.ids.progress_label.text = "Запуск..."
+        self._log(f"Запуск: {len(sel)} задач", "title")
 
         def worker():
-            total = len(selected)
-            for idx, task in enumerate(selected, 1):
+            task_names = []
+            for i, t in enumerate(sel, 1):
                 if self._stop_event.is_set():
                     break
-                self._threadsafe_log(f"[{idx}/{total}] {task['name']}")
-                self._test_single_task(task)
-                Clock.schedule_once(lambda *_v, p=(idx / total) * 100: self._set_progress(p), 0)
-
-            Clock.schedule_once(lambda *_: self._finish_operation(), 0)
+                task_names.append(t['name'])
+                self._threadsafe_log(f"[{i}/{len(sel)}] {t['name']}")
+                self._test_task(t)
+                Clock.schedule_once(lambda *_v, p=(i/len(sel))*100: self._set_progress(p), 0)
+            # Объединяем VPN конфиги если тестировали VPN задачи
+            vpn_names = {'Base VPN', 'Bypass VPN'}
+            if any(n in vpn_names for n in task_names):
+                Clock.schedule_once(lambda *_: self.merge_vpn_configs(), 0)
+            Clock.schedule_once(lambda *_: self._finish_op(tested_tasks=task_names), 0)
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _test_single_task(self, task: dict):
+    def _test_task(self, task):
         if task["type"] == "xray":
-            all_configs: List[str] = []
-            for raw_file in task.get("raw_files", []):
-                if os.path.exists(raw_file):
-                    all_configs.extend(read_configs_from_file(raw_file))
-
-            if not all_configs:
+            configs = []
+            for f in task.get("raw_files", []):
+                if os.path.exists(f):
+                    configs.extend(read_configs_from_file(f))
+            if not configs:
                 self._threadsafe_log(f"{task['name']}: нет конфигов", "warning")
                 return
+            w, p, f = test_xray_configs(
+                configs=configs, target_url=task["target_url"],
+                max_ping_ms=task["max_ping_ms"], required_count=task["required_count"],
+                xray_path=XRAY_BIN, out_file=task["out_file"],
+                profile_title=task.get("profile_title"), config_type=task.get("type"),
+                log_func=self._threadsafe_log, progress_func=self._threadsafe_progress,
+                stop_flag=self._stop_event)
+            self._threadsafe_log(f"{task['name']}: ok={w}, pass={p}, fail={f}", "success" if p > 0 else "warning")
+        else:
+            configs = []
+            for f in task.get("raw_files", []):
+                if os.path.exists(f):
+                    configs.extend(read_mtproto_from_file(f))
+            if not configs:
+                self._threadsafe_log(f"{task['name']}: нет MTProto", "warning")
+                return
+            w, p, f = test_mtproto_configs(
+                configs=configs, max_ping_ms=task["max_ping_ms"],
+                required_count=task["required_count"], out_file=task["out_file"],
+                profile_title=task.get("profile_title"), log_func=self._threadsafe_log,
+                progress_func=lambda c, t: self._threadsafe_progress(c, t, 0, 0),
+                stop_flag=self._stop_event)
+            self._threadsafe_log(f"{task['name']}: ok={w}, pass={p}, fail={f}", "success" if p > 0 else "warning")
 
-            working, passed, failed = test_xray_configs(
-                configs=all_configs,
-                target_url=task["target_url"],
-                max_ping_ms=task["max_ping_ms"],
-                required_count=task["required_count"],
-                xray_path=XRAY_BIN,
-                out_file=task["out_file"],
-                profile_title=task.get("profile_title"),
-                config_type=task.get("type"),
-                log_func=self._threadsafe_log,
-                progress_func=self._threadsafe_progress,
-                stop_flag=self._stop_event,
-            )
-            self._threadsafe_log(
-                f"{task['name']}: working={working}, passed={passed}, failed={failed}",
-                "success",
-            )
-            return
-
-        all_configs = []
-        for raw_file in task.get("raw_files", []):
-            if os.path.exists(raw_file):
-                all_configs.extend(read_mtproto_from_file(raw_file))
-
-        if not all_configs:
-            self._threadsafe_log(f"{task['name']}: нет MTProto прокси", "warning")
-            return
-
-        working, passed, failed = test_mtproto_configs(
-            configs=all_configs,
-            max_ping_ms=task["max_ping_ms"],
-            required_count=task["required_count"],
-            out_file=task["out_file"],
-            profile_title=task.get("profile_title"),
-            log_func=self._threadsafe_log,
-            progress_func=lambda cur, total: self._threadsafe_progress(cur, total, 0, 0),
-            stop_flag=self._stop_event,
-        )
-        self._threadsafe_log(
-            f"{task['name']}: working={working}, passed={passed}, failed={failed}",
-            "success",
-        )
+    def skip_file(self):
+        self._stop_event.set()
+        self._log("Пропущено", "warning")
 
     def stop_operation(self):
         self._stop_event.set()
-        self._log("Остановка запрошена", "warning")
+        self._log("Остановка", "warning")
 
-    def _finish_operation(self):
-        self._is_running = False
-        self._set_progress(100)
-        self._toast("Операция завершена")
-
-    def _set_progress(self, value: float):
-        self.root.ids.progress.value = max(0, min(100, value))
-
-    def _threadsafe_progress(self, current: int, total: int, *_):
-        if total <= 0:
+    # ─── Подписка на сервер ────────────────────────────────────
+    def _upload_subscription(self, tested_tasks=None):
+        """Отправляет на сервер только результаты протестированных задач."""
+        if not auth_module.is_logged_in():
             return
-        pct = (current / total) * 100
-        Clock.schedule_once(lambda *_: self._set_progress(pct), 0)
+        all_task_names = [t['name'] for t in self.tasks]
+        if tested_tasks is None:
+            tested_tasks = all_task_names
+        vpn_tasks = [t for t in tested_tasks if t in ('Base VPN', 'Bypass VPN')]
+        mt_task = 'Telegram MTProto' in tested_tasks
+        vpn_content = ""
+        mt_content = ""
+        if vpn_tasks:
+            vpn_file = os.path.join(RESULTS_DIR, "all_top_vpn.txt")
+            if os.path.exists(vpn_file):
+                with open(vpn_file, 'r', encoding='utf-8') as f:
+                    vpn_content = f.read().strip()
+            else:
+                self._log("all_top_vpn.txt не найден", "warning")
+        if mt_task:
+            mt_file = os.path.join(RESULTS_DIR, "top_telegram_mtproto.txt")
+            if os.path.exists(mt_file):
+                with open(mt_file, 'r', encoding='utf-8') as f:
+                    mt_content = f.read().strip()
+            else:
+                self._log("Файл MTProto не найден", "warning")
+        if not vpn_content and not mt_content:
+            self._toast("Нет результатов для отправки")
+            return
 
-    def _threadsafe_log(self, message: str, tag: str = "info"):
-        Clock.schedule_once(lambda *_: self._log(message, tag), 0)
+        def _ask_retry():
+            """Показывает диалог при сетевой неудаче."""
+            try:
+                from kivymd.uix.dialog import MDDialog
+                from kivymd.uix.button import MDRaisedButton, MDFlatButton
 
-    def _log(self, message: str, tag: str = "info"):
-        prefix = {
-            "success": "✅",
-            "warning": "⚠️",
-            "error": "❌",
-            "info": "ℹ️",
-        }.get(tag, "ℹ️")
-        existing = self.root.ids.log_label.text
-        self.root.ids.log_label.text = f"{existing}\n{prefix} {message}"[-5000:]
+                def _on_retry(*_):
+                    dlg.dismiss()
+                    self._upload_subscription(tested_tasks=tested_tasks)
+
+                dlg = MDDialog(
+                    title="Обновление подписки",
+                    text="Обновление не удалось. Возможно, у вас работают белые списки. Подключитесь к стабильной сети и повторите попытку.",
+                    buttons=[
+                        MDFlatButton(text="Отмена", on_release=lambda *_: dlg.dismiss()),
+                        MDRaisedButton(text="Повторить", on_release=_on_retry),
+                    ],
+                )
+                dlg.open()
+            except Exception:
+                self._toast("Ошибка сети. Повторите позже.")
+
+        def up():
+            try:
+                if vpn_content:
+                    auth_module.update_subscription(vpn_content)
+                if mt_content:
+                    auth_module.update_mtproto(mt_content)
+                msgs = []
+                if vpn_content:
+                    msgs.append("VPN")
+                if mt_content:
+                    msgs.append("MTProto")
+                Clock.schedule_once(lambda *_: self._log(f"Подписка обновлена: {', '.join(msgs)}", "success"), 0)
+                Clock.schedule_once(lambda *_: self._toast("Подписка обновлена"), 0)
+            except auth_module.AuthError as exc:
+                err_msg = str(exc)
+                Clock.schedule_once(lambda *_: self._log(f"Ошибка авторизации: {err_msg}", "error"), 0)
+                Clock.schedule_once(lambda *_: _ask_retry(), 0)
+            except Exception as exc:
+                err_msg = str(exc)
+                Clock.schedule_once(lambda *_: self._log(f"Ошибка отправки: {err_msg}", "error"), 0)
+                Clock.schedule_once(lambda *_: _ask_retry(), 0)
+
+        threading.Thread(target=up, daemon=True).start()
+
+    def _ask_update_sub_or_open_folder(self, tested_tasks=None):
+        """После теста спрашивает: обновить подписку. Если нет — открыть папку."""
+        session = auth_module.get_session()
+        username = session.get("username") if session else None
+        if username == "admin":
+            self.open_results()
+            return
+        if not auth_module.is_logged_in():
+            self.open_results()
+            return
+
+        # Используем MDDialog из KivyMD
+        try:
+            from kivymd.uix.dialog import MDDialog
+            from kivymd.uix.button import MDRaisedButton, MDFlatButton
+
+            def _on_yes(*_):
+                dlg.dismiss()
+                self._upload_subscription(tested_tasks=tested_tasks)
+
+            def _on_no(*_):
+                dlg.dismiss()
+                self.open_results()
+
+            dlg = MDDialog(
+                title="Подписка",
+                text="Обновить вашу подписку на сервере?",
+                buttons=[
+                    MDFlatButton(text="Нет", on_release=_on_no),
+                    MDRaisedButton(text="Да", on_release=_on_yes),
+                ],
+            )
+            dlg.open()
+        except Exception:
+            # Fallback — просто открываем папку
+            self.open_results()
+
+    def merge_vpn_configs(self):
+        """Объединяет top_base_vpn.txt и top_bypass_vpn.txt в all_top_vpn.txt."""
+        try:
+            cfgs = []
+            for fn in ["top_base_vpn.txt", "top_bypass_vpn.txt"]:
+                fp = os.path.join(RESULTS_DIR, fn)
+                if os.path.exists(fp):
+                    with open(fp, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            line = line.strip()
+                            if line and not line.startswith('#'):
+                                cfgs.append(line)
+            if cfgs:
+                out = os.path.join(RESULTS_DIR, "all_top_vpn.txt")
+                with open(out, 'w', encoding='utf-8') as f:
+                    f.write("#profile-update-interval: 48\n")
+                    f.write("#support-url: https://t.me/arqhub\n\n")
+                    for c in cfgs:
+                        f.write(f"{c}\n")
+                self._log(f"Объединено {len(cfgs)} конфигов в all_top_vpn.txt", "success")
+        except Exception as e:
+            self._log(f"Ошибка объединения: {e}", "error")
+
+    def _finish_op(self, tested_tasks=None):
+        self._is_running = False
+        self._enable_control_buttons(False)
+        self._set_progress(100)
+        self.root.ids.progress_label.text = "Готово"
+        self._log("Завершено", "success")
+        self._toast("Готово")
+        # После теста — спросить про обновление подписки
+        if tested_tasks:
+            Clock.schedule_once(lambda *_: self._ask_update_sub_or_open_folder(tested_tasks=tested_tasks), 0.5)
+
+    # ─── Утилиты ───────────────────────────────────────────────
+    def open_results(self):
+        import subprocess, sys
+        if not os.path.exists(RESULTS_DIR):
+            self._toast("Папка пуста")
+            return
+        if sys.platform == "win32":
+            os.startfile(RESULTS_DIR)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", RESULTS_DIR])
+        else:
+            subprocess.Popen(["xdg-open", RESULTS_DIR])
+
+    def logout(self):
+        auth_module.clear_session()
+        self.switch_screen("login")
+        self._toast("Выход")
 
     def _toast(self, text: str):
         try:
-            Snackbar(text=text, duration=2).open()
+            from kivymd.uix.snackbar import Snackbar
+            Snackbar(text=text, duration=1.5).open()
         except Exception:
-            self._log(text, "info")
+            pass
+
+    def _show_error_dialog(self, title: str, message: str):
+        """Показывает модальный диалог с ошибкой."""
+        try:
+            from kivymd.uix.dialog import MDDialog
+            from kivymd.uix.button import MDFlatButton
+            
+            dlg = MDDialog(
+                title=title,
+                text=message,
+                buttons=[
+                    MDFlatButton(
+                        text="OK",
+                        md_bg_color=self.c_accent,
+                        text_color=(1, 1, 1, 1),
+                        on_release=lambda *_: dlg.dismiss()
+                    ),
+                ],
+            )
+            dlg.open()
+        except Exception:
+            # Fallback на toast, если диалог не сработал
+            self._toast(f"{title}: {message}")
 
 
 def main():
