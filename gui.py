@@ -27,6 +27,7 @@ from kivy.core.clipboard import Clipboard
 from kivy.graphics import Color, RoundedRectangle
 from kivy.lang import Builder
 from kivy.metrics import dp
+from kivy.properties import StringProperty
 from kivy.uix.screenmanager import FadeTransition, ScreenManager
 
 from kivymd.app import MDApp
@@ -112,9 +113,165 @@ class NoAnimBtn(ButtonBehavior, MDBoxLayout):
     text = property(_get_text, _set_text)
 
 
+class TypeBtnButton(ButtonBehavior, MDBoxLayout):
+    """Кнопка типа (xray/mtproto) с динамическим цветом."""
+    ACCENT = (0.545, 0.361, 0.965, 1)
+    INACTIVE_BG = (0.12, 0.12, 0.14, 1)
+    ACTIVE_TEXT = (1, 1, 1, 1)
+    INACTIVE_TEXT = (0.322, 0.322, 0.357, 1)
+
+    def __init__(self, btn_type="xray", is_active=False, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = "horizontal"
+        self.size_hint_x = None
+        self.width = dp(80)
+        self.size_hint_y = None
+        self.height = dp(28)
+        self._type_val = btn_type
+
+        self._label = MDLabel(
+            text="Xray" if btn_type == "xray" else "MTProto",
+            halign="center",
+            valign="middle",
+            theme_text_color="Custom",
+            text_color=self.ACTIVE_TEXT if is_active else self.INACTIVE_TEXT,
+            font_size=dp(13),
+            size_hint=(1, 1)
+        )
+        self.add_widget(self._label)
+
+        bg = self.ACCENT if is_active else self.INACTIVE_BG
+        with self.canvas.before:
+            self._color_instr = Color(bg[0], bg[1], bg[2], bg[3])
+            self._bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[7])
+
+        self.bind(pos=self._upd_rect, size=self._upd_rect)
+
+    def _upd_rect(self, *args):
+        self._bg_rect.pos = self.pos
+        self._bg_rect.size = self.size
+
+    def _set_active(self, is_active):
+        color = self.ACCENT if is_active else self.INACTIVE_BG
+        self._color_instr.rgba = color
+        self._label.text_color = self.ACTIVE_TEXT if is_active else self.INACTIVE_TEXT
+
+
+class AuthTabButton(ButtonBehavior, MDBoxLayout):
+    """Кнопка таба авторизации (Вход/Регистрация) с динамическим цветом."""
+    tab_type = StringProperty("login")
+    
+    ACCENT = (0.545, 0.361, 0.965, 1)
+    INACTIVE_BG = (0, 0, 0, 0)
+    ACTIVE_TEXT = (1, 1, 1, 1)
+    INACTIVE_TEXT = (0.443, 0.443, 0.478, 1)  # c_dim
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = "horizontal"
+        self.size_hint_x = 0.5
+        self.size_hint_y = None
+        self.height = dp(36)
+        self._label = None
+        self._is_active = True  # По умолчанию активна
+
+        with self.canvas.before:
+            self._color_instr = Color(*self.ACCENT)
+            self._bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[7])
+
+        self.bind(pos=self._upd_rect, size=self._upd_rect, tab_type=self._on_tab_type_changed)
+        # Создаём label после bind
+        self._create_label()
+
+    def _create_label(self):
+        """Создаёт MDLabel."""
+        if self._label is not None:
+            return
+        self._label = MDLabel(
+            text="Вход" if self.tab_type == "login" else "Регистрация",
+            halign="center",
+            valign="middle",
+            theme_text_color="Custom",
+            text_color=self.ACTIVE_TEXT,
+            font_size=dp(15),
+            size_hint=(1, 1),
+        )
+        self.add_widget(self._label)
+    
+    def _on_tab_type_changed(self, *args):
+        """Обновляет текст при изменении tab_type."""
+        if self._label is not None:
+            self._label.text = "Вход" if self.tab_type == "login" else "Регистрация"
+
+    def _upd_rect(self, *args):
+        self._bg_rect.pos = self.pos
+        self._bg_rect.size = self.size
+
+    def _set_active(self, is_active):
+        self._is_active = is_active
+        color = self.ACCENT if is_active else self.INACTIVE_BG
+        self._color_instr.rgba = color
+        self._label.text_color = self.ACTIVE_TEXT if is_active else self.INACTIVE_TEXT
+
+
+class AuthMainButton(ButtonBehavior, MDBoxLayout):
+    """Главная кнопка авторизации (Войти/Зарегистрироваться) с фиксированным размером."""
+    ACCENT = (0.545, 0.361, 0.965, 1)
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = "horizontal"
+        self.size_hint_x = None
+        self.width = dp(200)
+        self.size_hint_y = None
+        self.height = dp(44)
+
+        self._label = MDLabel(
+            text="Войти",
+            halign="center",
+            valign="middle",
+            theme_text_color="Custom",
+            text_color=(1, 1, 1, 1),
+            font_size=dp(16),
+            size_hint=(1, 1),
+        )
+        self.add_widget(self._label)
+
+        with self.canvas.before:
+            self._color_instr = Color(*self.ACCENT)
+            self._bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[10])
+
+        self.bind(pos=self._upd_rect, size=self._upd_rect)
+        self._anim = None
+
+    def _upd_rect(self, *args):
+        self._bg_rect.pos = self.pos
+        self._bg_rect.size = self.size
+    
+    def set_text(self, text: str):
+        """Плавно меняет текст с анимацией затухания/появления."""
+        if self._anim:
+            self._anim.cancel(self._label)
+        
+        # Анимация затухания
+        self._anim = Animation(text_color=(0.3, 0.3, 0.3, 0), duration=0.15)
+        self._anim.bind(on_complete=lambda *_: self._show_new_text(text))
+        self._anim.start(self._label)
+    
+    def _show_new_text(self, text):
+        """Устанавливает новый текст и анимирует появление."""
+        self._label.text = text
+        # Анимация появления
+        self._anim = Animation(text_color=(1, 1, 1, 1), duration=0.15)
+        self._anim.start(self._label)
+
+
 from kivy.factory import Factory
 Factory.register("ClickableLabel", cls=ClickableLabel)
 Factory.register("NoAnimBtn", cls=NoAnimBtn)
+Factory.register("TypeBtnButton", cls=TypeBtnButton)
+Factory.register("AuthTabButton", cls=AuthTabButton)
+Factory.register("AuthMainButton", cls=AuthMainButton)
 
 import auth as auth_module
 from config import RESULTS_DIR, XRAY_BIN
@@ -133,6 +290,12 @@ YELLOW = "#facc15"
 RED = "#ef4444"
 CARD_BG = (0.086, 0.086, 0.094, 1)
 BG = (0.05, 0.05, 0.05, 1)
+
+
+def _hex_to_rgba(hex_color: str, alpha: float = 1.0) -> tuple:
+    """Конвертирует hex цвет в RGBA кортеж."""
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i:i+2], 16) / 255.0 for i in (0, 2, 4)) + (alpha,)
 
 KV = r'''
 #:import dp kivy.metrics.dp
@@ -265,16 +428,27 @@ KV = r'''
                     height: dp(20)
 
                 ThemedCard:
+                    spacing: dp(8)
+
+                    MDLabel:
+                        text: "Введите логин"
+                        theme_text_color: "Hint"
+                        size_hint_y: None
+                        height: dp(18)
 
                     MDTextField:
                         id: login_user
-                        hint_text: "Логин"
                         size_hint_y: None
                         height: dp(44)
 
+                    MDLabel:
+                        text: "Введите пароль"
+                        theme_text_color: "Hint"
+                        size_hint_y: None
+                        height: dp(18)
+
                     MDTextField:
                         id: login_pass
-                        hint_text: "Пароль"
                         password: True
                         size_hint_y: None
                         height: dp(44)
@@ -287,38 +461,20 @@ KV = r'''
                         padding: 0
                         spacing: dp(2)
 
-                        MDButton:
+                        AuthTabButton:
                             id: tab_login
-                            size_hint_x: 0.5
-                            md_bg_color: app.c_accent
+                            tab_type: "login"
                             on_release: app.set_auth_mode("login")
 
-                            MDButtonText:
-                                id: tab_login_text
-                                text: "Вход"
-                                text_color: 1, 1, 1, 1
-
-                        MDButton:
+                        AuthTabButton:
                             id: tab_register
-                            size_hint_x: 0.5
-                            md_bg_color: (0, 0, 0, 0)
+                            tab_type: "register"
                             on_release: app.set_auth_mode("register")
 
-                            MDButtonText:
-                                id: tab_register_text
-                                text: "Регистрация"
-                                text_color: app.c_dim
-
-                    MDButton:
+                    AuthMainButton:
                         id: auth_btn
-                        size_hint_x: 0.5
                         pos_hint: {"center_x": 0.5}
-                        md_bg_color: app.c_accent
                         on_release: app.do_auth()
-
-                        MDButtonText:
-                            text: "Войти"
-                            text_color: 1, 1, 1, 1
 
                 Widget:
 
@@ -397,14 +553,28 @@ KV = r'''
                                     text: "Скопировать ссылку"
                                     text_color: app.c_dim
 
-                        ClickableLabel:
-                            id: bot_link_label
-                            text: "Применить тг прокси можно в боте [color=#a78bfa]@arqvpn_bot[/color]"
-                            theme_text_color: "Hint"
+                        MDBoxLayout:
+                            id: bot_link_container
+                            orientation: "horizontal"
                             size_hint_y: None
                             height: dp(24)
-                            markup: True
-                            on_release: app.open_bot_link()
+                            spacing: dp(2)
+
+                            MDLabel:
+                                text: "Применить тг прокси можно в боте "
+                                theme_text_color: "Hint"
+                                size_hint_x: None
+                                adaptive_width: True
+
+                            ClickableLabel:
+                                id: bot_link_label
+                                text: "@arqvpn_bot"
+                                theme_text_color: "Custom"
+                                text_color: app.c_accent
+                                bold: True
+                                size_hint_x: None
+                                adaptive_width: True
+                                on_release: app.open_bot_link()
 
                         MDButton:
                             id: start_btn
@@ -679,14 +849,14 @@ class KivyGUIApp(MDApp):
             self._refresh_sub_url()
         # Инициализация табов авторизации
         self._init_auth_tabs()
-        # Hover-эффект для ссылок
-        lbl = self.root.ids.bot_link_label
-        lbl.bind(on_enter=lambda *_: setattr(lbl, 'text_color', (0.75, 0.55, 1, 1)))
-        lbl.bind(on_leave=lambda *_: setattr(lbl, 'text_color', (0.44, 0.44, 0.48, 1)))
         # Hover-эффект для arq (канал)
         arq_lbl = self.root.ids.arq_link_label
         arq_lbl.bind(on_enter=lambda *_: setattr(arq_lbl, 'text_color', (0.75, 0.55, 1, 1)))
         arq_lbl.bind(on_leave=lambda *_: setattr(arq_lbl, 'text_color', self.c_accent))
+        # Hover-эффект для @arqvpn_bot
+        bot_lbl = self.root.ids.bot_link_label
+        bot_lbl.bind(on_enter=lambda *_: setattr(bot_lbl, 'text_color', (0.75, 0.55, 1, 1)))
+        bot_lbl.bind(on_leave=lambda *_: setattr(bot_lbl, 'text_color', self.c_accent))
 
     def _init_auth_tabs(self):
         self.set_auth_mode("login")
@@ -696,26 +866,17 @@ class KivyGUIApp(MDApp):
         self._auth_mode = mode
         tab_login = self.root.ids.tab_login
         tab_register = self.root.ids.tab_register
-        tab_login_text = self.root.ids.tab_login_text
-        tab_register_text = self.root.ids.tab_register_text
 
         if mode == "login":
-            tab_login.md_bg_color = self.c_accent
-            tab_login_text.text_color = (1, 1, 1, 1)
-            tab_register.md_bg_color = (0, 0, 0, 0)
-            tab_register_text.text_color = self.c_dim
+            tab_login._set_active(True)
+            tab_register._set_active(False)
         else:
-            tab_register.md_bg_color = self.c_accent
-            tab_register_text.text_color = (1, 1, 1, 1)
-            tab_login.md_bg_color = (0, 0, 0, 0)
-            tab_login_text.text_color = self.c_dim
+            tab_register._set_active(True)
+            tab_login._set_active(False)
 
         # Обновляем текст кнопки авторизации
         auth_btn = self.root.ids.auth_btn
-        for c in auth_btn.children:
-            if isinstance(c, MDButtonText):
-                c.text = "Войти" if mode == "login" else "Зарегистрироваться"
-                break
+        auth_btn.set_text("Войти" if mode == "login" else "Зарегистрироваться")
 
     def _load_initial_state(self):
         settings = load_settings()
@@ -777,27 +938,45 @@ class KivyGUIApp(MDApp):
         if not self._loading_active:
             return
         dots = "." * (self._loading_dots % 4)
-        _set_btn_text(btn, f"{self._loading_text}{dots}")
+        current_text = "Подключение" if self._auth_mode == "login" else "Регистрация"
+        btn.set_text(f"{current_text}{dots}")
         self._loading_dots += 1
         Clock.schedule_once(lambda *_: self._animate_dots(btn), 0.5)
 
     def _auth_ok(self, btn):
+        print(f"[DEBUG] _auth_ok вызван")
         self._loading_active = False
         btn.disabled = False
-        _set_btn_text(btn, "Войти")
+        btn.set_text("Войти")
         self._refresh_sub_url()
         self.switch_screen("main")
-        self._toast("Успешный вход")
+        Clock.schedule_once(lambda *_: self._show_toast("Успешный вход"), 0.3)
 
     def _auth_fail(self, btn, msg: str):
+        print(f"[DEBUG] _auth_fail: {msg}")
         self._loading_active = False
         btn.disabled = False
         # Восстанавливаем текст кнопки в зависимости от режима
-        _set_btn_text(btn, "Войти" if self._auth_mode == "login" else "Зарегистрироваться")
-        
-        # Показываем диалог с ошибкой для большей наглядности
-        self._show_error_dialog("Ошибка авторизации", msg)
-        self._log(f"Ошибка авторизации: {msg}", "error")
+        btn.set_text("Войти" if self._auth_mode == "login" else "Зарегистрироваться")
+
+        # Показываем ошибку через Clock в главном потоке
+        Clock.schedule_once(lambda *_: self._show_toast(f"Ошибка: {msg}"), 0.1)
+
+    def _show_toast(self, text: str):
+        """Показывает toast в главном потоке."""
+        try:
+            from kivymd.uix.snackbar import Snackbar
+            Snackbar(text=text, timeout=3.0).open()
+        except ImportError:
+            # KivyMD 2.x — другой API
+            try:
+                from kivymd.uix.snackbar.snackbar import Snackbar
+                Snackbar(text=text, timeout=3.0).open()
+            except Exception:
+                # Fallback — используем простой print
+                print(f"[TOAST] {text}")
+        except Exception as e:
+            print(f"[DEBUG] Ошибка показа toast: {e}")
 
     def _refresh_sub_url(self):
         try:
@@ -1012,36 +1191,31 @@ class KivyGUIApp(MDApp):
         card['name_input'] = name_input
         frame.add_widget(name_input)
 
-        # Тип
+        # Переключаемый тип
+        card['type_var'] = data.get("type", "xray")
         type_row = MDBoxLayout(orientation="horizontal", adaptive_height=True,
                                spacing=dp(6), size_hint_y=None, height=dp(36))
         type_lbl = MDLabel(text="Тип:", theme_text_color="Secondary",
                             size_hint_x=None, adaptive_width=True)
         type_row.add_widget(type_lbl)
 
-        def make_btn(val, text):
-            is_active = card['type_var'] == val
-            btn = MDButton(
-                MDButtonText(
-                    text=text,
-                    text_color=(1,1,1,1) if is_active else self.c_muted,
-                ),
-                md_bg_color=self.c_accent if is_active else (0.1,0.1,0.11,1),
-                size_hint_y=None, height=dp(28),
-            )
-            def _switch(*_):
-                card['type_var'] = val
+        card['type_btns'] = []
+        
+        for btn_type in ["xray", "mtproto"]:
+            is_active = (card['type_var'] == btn_type)
+            
+            btn = TypeBtnButton(btn_type=btn_type, is_active=is_active)
+            
+            def on_type_click(instance, button=btn, selected_type=btn_type):
+                card['type_var'] = selected_type
                 for b in card['type_btns']:
-                    a = card['type_var'] == b._val
-                    b.md_bg_color = self.c_accent if a else (0.1,0.1,0.11,1)
-                    b.children[0].text_color = (1,1,1,1) if a else self.c_muted
-            btn.bind(on_release=_switch)
-            btn._val = val
+                    is_sel = (selected_type == b._type_val)
+                    b._set_active(is_sel)
+            
+            btn.bind(on_release=on_type_click)
+            
             type_row.add_widget(btn)
             card['type_btns'].append(btn)
-
-        make_btn("xray", "Xray")
-        make_btn("mtproto", "MTProto")
         frame.add_widget(type_row)
 
         frame.add_widget(MDLabel(text="Источники (URL):", theme_text_color="Secondary",
@@ -1234,8 +1408,8 @@ class KivyGUIApp(MDApp):
                     break
 
         if running:
-            _set_btn_state(stop, True, tuple(RED) + (1,), tuple(RED) + (0.2,))
-            _set_btn_state(skip, True, tuple(YELLOW) + (1,), tuple(YELLOW) + (0.2,))
+            _set_btn_state(stop, True, _hex_to_rgba(RED, 1.0), _hex_to_rgba(RED, 0.2))
+            _set_btn_state(skip, True, _hex_to_rgba(YELLOW, 1.0), _hex_to_rgba(YELLOW, 0.2))
         else:
             _set_btn_state(stop, False, self.c_muted, (0, 0, 0, 0))
             _set_btn_state(skip, False, self.c_muted, (0, 0, 0, 0))
@@ -1509,27 +1683,40 @@ class KivyGUIApp(MDApp):
 
     def _toast(self, text: str):
         try:
-            from kivymd.uix.snackbar import Snackbar
-            Snackbar(text=text, timeout=1.5).open()
+            from kivymd.uix.snackbar import MDSnackbar, MDSnackbarSupportingText
+            sb = MDSnackbar(
+                MDSnackbarSupportingText(
+                    text=text,
+                    theme_text_color="Custom",
+                    text_color="#e4e4e7",
+                ),
+                y=0,
+                pos_hint={"center_x": 0.5},
+                size_hint_x=1.0,
+            )
+            sb.md_bg_color = [0.18, 0.18, 0.22, 1]
+            sb.open()
         except Exception:
             pass
 
-    def _show_error_dialog(self, title: str, message: str):
-        """Показывает модальный диалог с ошибкой."""
+    def _show_toast(self, text: str):
+        """Показывает toast в главном потоке."""
         try:
-            from kivymd.uix.dialog import MDDialog
-
-            dlg = MDDialog(
-                title=title,
-                text=message,
-                buttons=[
-                    _mk_btn("OK", on_release=lambda *_: dlg.dismiss(), bg_color=self.c_accent),
-                ],
+            from kivymd.uix.snackbar import MDSnackbar, MDSnackbarSupportingText
+            sb = MDSnackbar(
+                MDSnackbarSupportingText(
+                    text=text,
+                    theme_text_color="Custom",
+                    text_color="#e4e4e7",
+                ),
+                y=0,
+                pos_hint={"center_x": 0.5},
+                size_hint_x=1.0,
             )
-            dlg.open()
+            sb.md_bg_color = [0.18, 0.18, 0.22, 1]
+            sb.open()
         except Exception:
-            # Fallback на toast, если диалог не сработал
-            self._toast(f"{title}: {message}")
+            pass
 
 
 def main():
