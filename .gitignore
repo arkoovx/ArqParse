@@ -1,0 +1,48 @@
+# Виртуальное окружение
+venv/
+.venv/
+env/
+
+# Python кеш
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache/
+.ruff_cache/
+
+# Логи
+*.log
+arcparse_log.txt
+
+# Скачанные сырые конфиги и результаты (генерируются автоматически)
+rawconfigs/
+results/
+
+# IDE и редакторы
+.idea/
+.vscode/
+*.swp
+.qwen/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Конфигурация и секреты
+settings.json
+.env
+*.keystore
+
+# Buildozer и Android build
+.buildozer/
+bin/
+*.apk
+*.aab
+buildozer.spec
+
+# Прочее
+GEMINI.md
+
+# Server
+server/

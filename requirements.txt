@@ -1,0 +1,9 @@
+tls-client>=1.0.0
+requests>=2.28.0
+PySocks>=1.7.1
+# Для MTProto нужна одна из библиотек (pycryptodome предпочтительнее, cryptography как fallback)
+pycryptodome>=3.15.0
+cryptography>=3.4.0
+# Современный кроссплатформенный GUI (Material 3)
+kivy>=2.3.0
+kivymd @ https://github.com/kivymd/KivyMD/archive/master.zip
