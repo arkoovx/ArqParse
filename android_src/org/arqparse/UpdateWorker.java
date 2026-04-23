@@ -2,11 +2,9 @@ package org.arqparse;
 
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import androidx.annotation.NonNull;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
-import org.kivy.android.PythonService;
 import android.util.Log;
 
 public class UpdateWorker extends Worker {
@@ -23,16 +21,25 @@ public class UpdateWorker extends Worker {
         try {
             Context context = getApplicationContext();
             
-            // В Android 12+ запуск обычного background service из Worker может вызвать исключение.
-            // PythonService.start внутри p4a умеет обрабатывать запуск.
-            // Аргумент "update" соответствует названию сервиса в buildozer.spec
+            // Название класса сервиса формируется как: <package_domain>.<package_name>.Service<CapitalizedServiceName>
+            // В нашем случае: org.arqparse.arqparse.ServiceUpdate
+            Intent intent = new Intent();
+            intent.setClassName(context.getPackageName(), "org.arqparse.arqparse.ServiceUpdate");
+            intent.putExtra("serviceEntrypoint", "service.py");
+            intent.putExtra("serviceTitle", "arqParse Auto-Update");
+            intent.putExtra("serviceDescription", "Updating configurations...");
+            intent.putExtra("pythonServiceArgument", "update");
             
-            PythonService.start(context, "arqParse Auto-Update", "service.py", "update");
+            // Запускаем сервис
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(intent);
+            } else {
+                context.startService(intent);
+            }
             
             return Result.success();
         } catch (Exception e) {
             Log.e(TAG, "Failed to start Python update service", e);
-            // Если ошибка временная (например, система перегружена), попробуем позже
             return Result.retry();
         }
     }
